@@ -90,7 +90,7 @@ ESP32-S3 XIAO:     █████                 21mm x 17mm  ← Fits anywher
 ![QR Code to GitHub repo](../qr-repo.jpg)
 
 **GitHub:** github.com/djdefi/traincam-ncngrr  
-**Contact:** djdefi@gmail.com • Issues & PRs welcome!
+**Contact:** Issues & PRs welcome!
 
 ---
 

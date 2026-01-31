@@ -118,4 +118,4 @@ Open source. See [LICENSE](LICENSE) for details.
 
 ---
 
-**Contact:** djdefi@gmail.com • [Open an issue](https://github.com/djdefi/traincam-ncngrr/issues)
+**Contact:** [Open an issue](https://github.com/djdefi/traincam-ncngrr/issues)
