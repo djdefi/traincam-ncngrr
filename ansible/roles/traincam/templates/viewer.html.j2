@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>TrainCam WebRTC Viewer</title>
+<style>
+ body { margin:0; background:#000; color:#eee; font:14px system-ui, sans-serif; width:100vw; height:100vh; overflow:hidden; }
+ header { padding:0.4rem 0.75rem; width:100%; box-sizing:border-box; background:rgba(0,0,0,0.45); position:fixed; top:0; left:0; display:flex; gap:1rem; align-items:center; z-index:10; backdrop-filter: blur(4px); transition:opacity .4s; }
+ h1 { margin:0; font-size:1.1rem; }
+ #status { font-size:0.8rem; opacity:0.8; }
+ #ui { position:fixed; top:2.4rem; left:0.6rem; z-index:10; display:flex; gap:0.4rem; flex-wrap:wrap; transition:opacity .4s; }
+ video { position:absolute; top:0; left:0; width:100vw; height:100vh; object-fit:cover; background:#000; transition:filter .3s; }
+ footer { transition:opacity .4s; }
+ body.ui-hidden header, body.ui-hidden #ui, body.ui-hidden footer { opacity:0; pointer-events:none; }
+ body.ui-hidden { cursor:none; }
+ button { background:#333; color:#eee; border:1px solid #555; padding:0.4rem 0.8rem; cursor:pointer; margin-right:0.4rem; }
+ button:hover { background:#444; }
+ footer { margin:1rem 0 2rem; font-size:0.7rem; opacity:0.6; }
+ .row { margin-top:0.5rem; }
+</style>
+</head>
+<body>
+  <header>
+    <h1>TrainCam WebRTC Viewer</h1>
+    <div id="status">Idle</div>
+  </header>
+  <div id="ui" class="row">
+    <button id="connectBtn">Connect</button>
+    <button id="disconnectBtn" disabled>Disconnect</button>
+  <button id="fsBtn">Fullscreen</button>
+  <button id="fitBtn" title="Toggle Fill / Fit">Fit</button>
+    <label style="font-size:0.75rem;">Auto-reconnect <input type="checkbox" id="autorec" checked></label>
+  </div>
+  <video id="video" autoplay playsinline muted></video>
+  <footer style="position:fixed; right:0.6rem; bottom:0.4rem; margin:0; z-index:10; background:rgba(0,0,0,0.35); padding:0.25rem 0.5rem; border-radius:4px;">LAN WebRTC &lt;500ms</footer>
+<script>
+const PATH = 'traincam';
+// Derive MediaMTX base (viewer served on 8080; mediamtx on 8889 by default)
+const MTX_BASE = (() => { try { const u = new URL(window.location.href); u.port='8889'; return u.origin; } catch(_) { return window.location.origin; } })();
+const AUTOREC_DELAY_MS = 1500;
+let pc, abortController, reconnectTimer, uiHideTimer;
+const statusEl = document.getElementById('status');
+const videoEl = document.getElementById('video');
+const connectBtn = document.getElementById('connectBtn');
+const disconnectBtn = document.getElementById('disconnectBtn');
+const fsBtn = document.getElementById('fsBtn');
+const fitBtn = document.getElementById('fitBtn');
+const autorec = document.getElementById('autorec');
+
+function log(msg){ console.log(msg); statusEl.textContent = msg; }
+function attemptFullscreen(auto=false){
+  const elem = document.fullscreenElement || document.webkitFullscreenElement;
+  if (!elem) videoEl.requestFullscreen?.().catch(()=>{ if(!auto) log('Fullscreen denied'); });
+}
+function scheduleUIHide(){ clearTimeout(uiHideTimer); uiHideTimer = setTimeout(()=>{ document.body.classList.add('ui-hidden'); }, 2000); }
+function showUI(){ document.body.classList.remove('ui-hidden'); scheduleUIHide(); }
+['mousemove','keydown','touchstart'].forEach(ev=>window.addEventListener(ev, showUI,{passive:true}));
+
+async function connect(){
+  if (pc) { log('Already connected'); return; }
+  abortController = new AbortController();
+  log('Creating PeerConnection...');
+  pc = new RTCPeerConnection({ iceServers: [] });
+  pc.addEventListener('track', ev => { if (ev.track.kind==='video') videoEl.srcObject = ev.streams[0]; });
+  pc.addEventListener('connectionstatechange', () => {
+    log('State: ' + pc.connectionState);
+    if (['disconnected','failed','closed'].includes(pc.connectionState)) { cleanup(); if (autorec.checked) scheduleReconnect(); }
+  });
+  pc.addTransceiver('video',{direction:'recvonly'});
+  const offer = await pc.createOffer();
+  await pc.setLocalDescription(offer);
+  const base = MTX_BASE.replace(/\/$/,'');
+  const primary = `${base}/whep/${PATH}`;
+  const legacy = `${base}/${PATH}/whep`;
+  let resp, attempt = 0;
+  for (const url of [primary, legacy]) {
+    attempt++; log(`WHEP attempt ${attempt}: POST ${url}`);
+    try { resp = await fetch(url,{method:'POST',body:offer.sdp,headers:{'Content-Type':'application/sdp','Accept':'application/sdp'},cache:'no-store',signal:abortController.signal}); }
+    catch(e){ log('Fetch error: '+e); resp=null; }
+    if (resp && resp.ok) { log(`WHEP attempt ${attempt} succeeded (${resp.status})`); break; }
+    if (resp && resp.status===404) { log('Primary pattern 404, trying fallback...'); continue; }
+    if (resp) { log(`WHEP rejected on attempt ${attempt}: ${resp.status}`); cleanup(); if (autorec.checked) scheduleReconnect(); return; }
+    cleanup(); if (autorec.checked) scheduleReconnect(); return;
+  }
+  if (!resp || !resp.ok) { log('WHEP 404 on all patterns'); cleanup(); if (autorec.checked) scheduleReconnect(); return; }
+  const answerSdp = await resp.text();
+  await pc.setRemoteDescription({type:'answer', sdp:answerSdp});
+  log('Connected');
+  connectBtn.disabled = true; disconnectBtn.disabled = false; showUI();
+}
+
+function cleanup(){ if (abortController) abortController.abort(); if (pc){ try{ pc.close(); }catch(_){} } pc=null; connectBtn.disabled=false; disconnectBtn.disabled=true; showUI(); }
+function scheduleReconnect(){ if (reconnectTimer) return; reconnectTimer=setTimeout(()=>{ reconnectTimer=null; connect(); }, AUTOREC_DELAY_MS); log('Reconnecting in '+AUTOREC_DELAY_MS+'ms...'); }
+connectBtn.onclick = () => { if (reconnectTimer){ clearTimeout(reconnectTimer); reconnectTimer=null;} connect(); showUI(); };
+disconnectBtn.onclick = () => { if (reconnectTimer){ clearTimeout(reconnectTimer); reconnectTimer=null;} autorec.checked=false; cleanup(); log('Disconnected'); };
+fsBtn.onclick = () => { attemptFullscreen(false); showUI(); };
+fitBtn.onclick = () => { if (videoEl.style.objectFit==='contain'){ videoEl.style.objectFit='cover'; fitBtn.textContent='Fit'; } else { videoEl.style.objectFit='contain'; fitBtn.textContent='Fill'; } showUI(); };
+window.addEventListener('load', () => { connect(); setTimeout(()=>attemptFullscreen(true),600); scheduleUIHide(); });
+</script>
+</body>
+</html>

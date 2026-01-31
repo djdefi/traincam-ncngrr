@@ -1,0 +1,14 @@
+# MediaMTX configuration (Ansible managed)
+logLevel: info
+
+# WebRTC configuration for local network streaming
+# No STUN servers - works offline on any local network (home WiFi, mobile hotspot, etc.)
+webrtcICEServers2: []
+
+# Explicit local addresses for WebRTC peer connections
+webrtcLocalUDPAddress: :8555
+webrtcLocalTCPAddress: :8556
+
+paths:
+  traincam:
+    # Single publisher (local ffmpeg) -> viewer(s)

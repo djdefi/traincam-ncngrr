@@ -1,0 +1,46 @@
+---
+- name: Reload systemd and restart traincam
+  ansible.builtin.systemd:
+    name: "{{ traincam_service_name }}.service"
+    state: restarted
+    daemon_reload: true
+
+- name: Restart traincam service
+  ansible.builtin.systemd:
+    name: "{{ traincam_service_name }}.service"
+    state: restarted
+
+- name: Restart mediamtx
+  ansible.builtin.systemd:
+    name: mediamtx.service
+    state: restarted
+
+- name: Reload systemd and restart viewer
+  ansible.builtin.systemd:
+    name: traincam-viewer.service
+    state: restarted
+    daemon_reload: true
+
+- name: Restart viewer service
+  ansible.builtin.systemd:
+    name: traincam-viewer.service
+    state: restarted
+
+- name: Reload udev rules
+  ansible.builtin.command: udevadm control --reload
+  notify: Trigger dma_heap
+
+- name: Trigger dma_heap
+  ansible.builtin.command: udevadm trigger /dev/dma_heap/system /dev/dma_heap/linux,cma
+  notify: Restart traincam service
+
+- name: Reload systemd and restart mediamtx
+  ansible.builtin.systemd:
+    name: mediamtx.service
+    state: restarted
+    daemon_reload: true
+
+- name: Restart NetworkManager
+  ansible.builtin.systemd:
+    name: NetworkManager.service
+    state: restarted

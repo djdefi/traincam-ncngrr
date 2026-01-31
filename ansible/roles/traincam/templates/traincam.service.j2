@@ -1,0 +1,26 @@
+[Unit]
+Description=TrainCam video streaming service
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=0
+StartLimitBurst=0
+ConditionPathExists=/usr/local/bin/mediamtx
+After=mediamtx.service
+
+[Service]
+Type=simple
+User={{ traincam_user }}
+Group={{ traincam_group }}
+WorkingDirectory={{ traincam_bin_dir | dirname }}
+EnvironmentFile=-{{ traincam_config_dir }}/stream.conf
+# dma_heap device permissions are now managed via a udev rule (99-dma-heap.rules)
+# so we no longer attempt to adjust ownership/mode at service start.
+ExecStart={{ traincam_bin_dir }}/publish.sh
+Restart=always
+RestartSec=2
+TimeoutStopSec=5
+KillSignal=SIGTERM
+RestartKillSignal=SIGTERM
+
+[Install]
+WantedBy=multi-user.target

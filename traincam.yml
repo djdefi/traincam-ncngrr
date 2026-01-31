@@ -1,0 +1,6 @@
+---
+- name: Deploy TrainCam streaming stack
+  hosts: traincam
+  become: yes
+  roles:
+    - traincam

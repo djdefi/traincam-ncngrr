@@ -1,0 +1,26 @@
+### TrainCam streaming configuration (Ansible managed)
+WIDTH={{ traincam_width }}
+HEIGHT={{ traincam_height }}
+FPS={{ traincam_fps }}
+PORT={{ traincam_port }}
+AWBGAINS="{{ traincam_awbgains }}"
+EXTRA_OPTS="{{ traincam_extra_opts }}"
+LOG_DIR={{ traincam_log_dir }}
+{% if traincam_keyframe_interval is defined %}KEYFRAME_INTERVAL={{ traincam_keyframe_interval }}
+{% endif %}{% if traincam_qp is defined %}QP={{ traincam_qp }}
+{% endif %}{% if traincam_rpi_cam_bin is defined %}RPI_CAM_BIN={{ traincam_rpi_cam_bin }}
+{% endif %}
+# Active latency mode (templated)
+{% if LATENCY_MODE is defined %}
+LATENCY_MODE={{ LATENCY_MODE }}
+{% else %}
+# Defaulting to ultra_plus (auto fallback when LATENCY_MODE unset in inventory)
+LATENCY_MODE=ultra_plus
+{% endif %}
+# Uncomment to reduce latency (adjusts keyframe interval automatically)
+# LATENCY_MODE=low         # GOP ~= FPS   (keyframe every ~1s at 24fps)
+# LATENCY_MODE=ultra       # GOP ~= FPS/2 (~0.5s)
+# LATENCY_MODE=ultra_plus  # GOP ~= FPS/4 (~0.25s) higher bitrate overhead
+
+# To force a specific keyframe interval regardless of LATENCY_MODE, set:
+# FORCE_KEYFRAME_INTERVAL=8

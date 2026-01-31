@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+
+# TrainCam streaming launcher (Ansible managed)
+set -euo pipefail
+IFS=$'\n\t'
+
+: "${WIDTH:=1280}"
+: "${HEIGHT:=720}"
+: "${FPS:=24}"
+: "${PORT:=8554}"
+: "${AWBGAINS:=1.00,1.12}"
+: "${EXTRA_OPTS:=}"
+: "${KEYFRAME_INTERVAL:=$((FPS*2))}"
+# Optional latency preset: LATENCY_MODE={low|ultra}
+#   low   -> keyframe every 1s
+#   ultra -> keyframe every ~0.5s
+if [[ "${LATENCY_MODE:-}" == "low" ]]; then
+  KEYFRAME_INTERVAL=$(( FPS ))
+elif [[ "${LATENCY_MODE:-}" == "ultra" ]]; then
+  HALF=$(( FPS / 2 ))
+  if [[ $HALF -lt 1 ]]; then HALF=1; fi
+  KEYFRAME_INTERVAL=$HALF
+fi
+log() { echo "$(date -Is) [traincam-stream] $*" >&2; }
+log "LATENCY_MODE=${LATENCY_MODE:-unset} KEYFRAME_INTERVAL=${KEYFRAME_INTERVAL}" 
+
+: "${QP:=}"
+: "${LOG_DIR:={{ traincam_log_dir }}}"
+
+mkdir -p "$LOG_DIR"
+trap 'log "Received termination signal; shutting down"; exit 0' TERM INT
+
+RPI_CAM_BIN="${RPI_CAM_BIN:-{{ traincam_rpi_cam_bin | default('$(command -v rpicam-vid || true)') }}}"
+if [[ -z "$RPI_CAM_BIN" || ! -x "$RPI_CAM_BIN" ]]; then
+  log "ERROR: rpicam-vid not found"; exit 127
+fi
+
+read -r -a EXTRA_ARRAY <<< "${EXTRA_OPTS}"
+CMD=("${RPI_CAM_BIN}" -t 0 --inline --listen -o "tcp://0.0.0.0:${PORT}" \
+     --width "${WIDTH}" --height "${HEIGHT}" --framerate "${FPS}" \
+     --awbgains "${AWBGAINS}")
+
+if [[ -n "${KEYFRAME_INTERVAL:-}" && "$KEYFRAME_INTERVAL" =~ ^[0-9]+$ ]]; then
+  CMD+=(--intra "${KEYFRAME_INTERVAL}")
+fi
+if [[ -n "${QP}" ]]; then
+  CMD+=(--qp "${QP}")
+fi
+CMD+=("${EXTRA_ARRAY[@]}")
+
+log "Starting rpicam-vid: ${CMD[*]}"
+exec "${CMD[@]}"

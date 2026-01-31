@@ -4,15 +4,14 @@
 #define CAMERA_MODEL_XIAO_ESP32S3 // Has PSRAM
 
 #include "camera_pins.h"
+#include "app_httpd.h"
 
 // ===========================
-// Enter your WiFi credentials
+// WiFi Configuration
 // ===========================
+// Default network for TrainCam. Change if using your own network.
 const char* ssid = "traincameranet";
-const char* password = "locomotive";
-
-void startCameraServer();
-void setupLedFlash(int pin);
+const char* password = "locomotive";  // Default password - change for production
 
 void setup() {
   if (Serial) {
@@ -44,7 +43,6 @@ void setup() {
   config.xclk_freq_hz = 20000000;
   config.frame_size = FRAMESIZE_UXGA;
   config.pixel_format = PIXFORMAT_JPEG; // for streaming
-  //config.pixel_format = PIXFORMAT_RGB565; // for face detection/recognition
   config.grab_mode = CAMERA_GRAB_WHEN_EMPTY;
   config.fb_location = CAMERA_FB_IN_PSRAM;
   config.jpeg_quality = 12;
@@ -63,7 +61,7 @@ void setup() {
       config.fb_location = CAMERA_FB_IN_DRAM;
     }
   } else {
-    // Best option for face detection/recognition
+    // Optimized for streaming performance
     config.frame_size = FRAMESIZE_240X240;
 #if CONFIG_IDF_TARGET_ESP32S3
     config.fb_count = 2;

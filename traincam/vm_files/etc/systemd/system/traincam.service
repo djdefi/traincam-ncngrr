@@ -1,0 +1,44 @@
+[Unit]
+Description=TrainCam video streaming service
+After=network-online.target
+Wants=network-online.target
+# Disable start rate limiting so service retries forever.
+StartLimitIntervalSec=0
+StartLimitBurst=0
+
+[Service]
+Type=simple
+User=train
+Group=train
+WorkingDirectory=/home/train
+EnvironmentFile=-/etc/traincam/stream.conf
+ExecStart=/home/train/bin/stream.sh
+Restart=always
+RestartSec=2
+TimeoutStopSec=5
+Nice=5
+IOSchedulingClass=best-effort
+IOSchedulingPriority=4
+# Logging controlled by journal; optionally uncomment for file append (systemd v240+)
+# StandardOutput=append:/var/log/traincam/stream.log
+# StandardError=append:/var/log/traincam/stream.err
+
+# Security / hardening (relaxed enough to allow camera & GPU access)
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/var/log/traincam
+RestrictSUIDSGID=true
+LockPersonality=true
+RestrictRealtime=true
+SystemCallFilter=@system-service
+DeviceAllow=/dev/vchiq rw
+DeviceAllow=/dev/video0 rw
+CapabilityBoundingSet=
+
+KillSignal=SIGTERM
+RestartKillSignal=SIGTERM
+
+[Install]
+WantedBy=multi-user.target

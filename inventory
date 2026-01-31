@@ -1,0 +1,2 @@
+[traincam]
+traincam1.local ansible_user=train

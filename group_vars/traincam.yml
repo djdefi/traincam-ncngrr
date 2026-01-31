@@ -1,0 +1,18 @@
+---
+traincam_group: train
+traincam_user: train
+traincam_service_name: traincam
+traincam_bin_dir: /home/train/bin
+traincam_config_dir: /etc/traincam
+traincam_unit_path: /etc/systemd/system/traincam.service
+traincam_log_dir: /var/log/traincam
+traincam_width: 1280
+traincam_height: 720
+traincam_fps: 24
+traincam_port: 8554
+traincam_awbgains: "1.00,1.12"
+traincam_extra_opts: ""
+# Ultra_plus latency (~0.25s GOP). Options: low (~1s), ultra (~0.5s), ultra_plus (~0.25s)
+LATENCY_MODE: ultra_plus
+mediamtx_version: "v1.15.2"
+mediamtx_download_url: "https://github.com/bluenviron/mediamtx/releases/download/v1.15.2/mediamtx_v1.15.2_linux_arm64.tar.gz"

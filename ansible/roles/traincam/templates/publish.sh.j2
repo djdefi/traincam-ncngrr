@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+# TrainCam RTSP publisher (Ansible managed)
+set -euo pipefail
+IFS=$'\n\t'
+
+# Load environment (dimensions, fps, gains, latency mode, etc.)
+if [[ -f {{ traincam_config_dir }}/stream.conf ]]; then
+  # shellcheck disable=SC1091
+  source {{ traincam_config_dir }}/stream.conf
+fi
+
+: "${WIDTH:={{ traincam_width }}}"
+: "${HEIGHT:={{ traincam_height }}}"
+: "${FPS:={{ traincam_fps }}}"
+: "${AWBGAINS:={{ traincam_awbgains }}}"
+: "${LATENCY_MODE:=}" # expected: low|ultra|ultra_plus
+: "${KEYFRAME_INTERVAL:=$((FPS*2))}"
+
+if [[ "${LATENCY_MODE}" == "low" ]]; then
+  KEYFRAME_INTERVAL=$(( FPS ))
+elif [[ "${LATENCY_MODE}" == "ultra" ]]; then
+  HALF=$(( FPS / 2 ))
+  (( HALF < 1 )) && HALF=1
+  KEYFRAME_INTERVAL=$HALF
+elif [[ "${LATENCY_MODE}" == "ultra_plus" ]]; then
+  QUARTER=$(( FPS / 4 ))
+  (( QUARTER < 2 )) && QUARTER=2
+  KEYFRAME_INTERVAL=$QUARTER
+fi
+
+# Allow explicit override even when LATENCY_MODE is set
+if [[ -n "${FORCE_KEYFRAME_INTERVAL:-}" ]]; then
+  KEYFRAME_INTERVAL="${FORCE_KEYFRAME_INTERVAL}"
+fi
+
+log() { echo "$(date -Is) [traincam-publish] $*" >&2; }
+
+RPI_CAM_BIN="${RPI_CAM_BIN:-$(command -v rpicam-vid || true)}"
+if [[ -z "$RPI_CAM_BIN" ]]; then
+  log "ERROR: rpicam-vid not found"; exit 127
+fi
+
+# Ensure ffmpeg exists
+if ! command -v ffmpeg >/dev/null 2>&1; then
+  log "ERROR: ffmpeg not installed"; exit 127
+fi
+
+log "LATENCY_MODE=${LATENCY_MODE:-unset} KEYFRAME_INTERVAL=${KEYFRAME_INTERVAL} (override=${FORCE_KEYFRAME_INTERVAL:-none})" 
+
+# rpicam-vid produces H264 to stdout; ffmpeg remuxes into RTSP to MediaMTX
+# MediaMTX must be running locally on 8554.
+# Removed -re (was throttling and triggering i/o timeouts on server when combined with small probe/analyze settings).
+exec \
+  "$RPI_CAM_BIN" -t 0 --inline \
+    --width "$WIDTH" --height "$HEIGHT" --framerate "$FPS" \
+    --awbgains "$AWBGAINS" --intra "$KEYFRAME_INTERVAL" -o - \
+  | ffmpeg -hide_banner -loglevel error -fflags nobuffer -probesize 256 -analyzeduration 50000 \
+    -f h264 -i - -c copy -rtsp_transport tcp -f rtsp rtsp://127.0.0.1:8554/traincam

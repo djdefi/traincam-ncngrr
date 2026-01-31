@@ -1,0 +1,12 @@
+---
+# .ansible-lint configuration
+skip_list:
+  - name[missing]  # Tasks without names are acceptable for simple operations
+  - yaml[line-length]  # Long lines in templates are acceptable
+
+warn_list:
+  - experimental  # Warn on experimental rules
+
+exclude_paths:
+  - .git/
+  - traincam/vm_files/  # Sample files, not production

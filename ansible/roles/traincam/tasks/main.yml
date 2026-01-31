@@ -1,0 +1,210 @@
+---
+- name: Ensure train group exists
+  ansible.builtin.group:
+    name: "{{ traincam_group }}"
+    state: present
+
+- name: Ensure train user exists
+  ansible.builtin.user:
+    name: "{{ traincam_user }}"
+    group: "{{ traincam_group }}"
+    create_home: yes
+    state: present
+
+- name: Create bin directory
+  ansible.builtin.file:
+    path: "{{ traincam_bin_dir }}"
+    state: directory
+    owner: "{{ traincam_user }}"
+    group: "{{ traincam_group }}"
+    mode: '0755'
+
+- name: Create config directory
+  ansible.builtin.file:
+    path: "{{ traincam_config_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Create log directory
+  ansible.builtin.file:
+    path: "{{ traincam_log_dir }}"
+    state: directory
+    owner: "{{ traincam_user }}"
+    group: "{{ traincam_group }}"
+    mode: '0755'
+
+- name: Deploy udev dma_heap rule
+  ansible.builtin.copy:
+    dest: /etc/udev/rules.d/99-dma-heap.rules
+    content: 'SUBSYSTEM=="dma_heap",GROUP="video",MODE="0660"'
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Reload udev rules
+
+- name: Ensure ffmpeg installed
+  ansible.builtin.package:
+    name: ffmpeg
+    state: present
+  become: true
+
+- name: Download mediamtx archive
+  ansible.builtin.get_url:
+    url: "{{ mediamtx_download_url }}"
+    dest: /tmp/mediamtx.tar.gz
+    mode: '0644'
+  register: mediamtx_download
+
+- name: Extract mediamtx binary
+  ansible.builtin.unarchive:
+    src: /tmp/mediamtx.tar.gz
+    dest: /usr/local/bin
+    remote_src: true
+    creates: /usr/local/bin/mediamtx
+  when: mediamtx_download is changed
+  notify: Restart mediamtx
+
+- name: Deploy stream script
+  ansible.builtin.template:
+    src: stream.sh.j2
+    dest: "{{ traincam_bin_dir }}/stream.sh"
+    owner: "{{ traincam_user }}"
+    group: "{{ traincam_group }}"
+    mode: '0755'
+  notify: Restart traincam service
+
+- name: Deploy RTSP publish script
+  ansible.builtin.template:
+    src: publish.sh.j2
+    dest: "{{ traincam_bin_dir }}/publish.sh"
+    owner: "{{ traincam_user }}"
+    group: "{{ traincam_group }}"
+    mode: '0755'
+  notify: Restart traincam service
+
+- name: Deploy stream configuration
+  ansible.builtin.template:
+    src: stream.conf.j2
+    dest: "{{ traincam_config_dir }}/stream.conf"
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Restart traincam service
+
+- name: Deploy systemd unit
+  ansible.builtin.template:
+    src: traincam.service.j2
+    dest: "{{ traincam_unit_path }}"
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Reload systemd and restart traincam
+
+- name: Create mediamtx config directory
+  ansible.builtin.file:
+    path: /etc/mediamtx
+    state: directory
+    owner: "{{ traincam_user }}"
+    group: "{{ traincam_group }}"
+    mode: '0755'
+
+- name: Deploy mediamtx configuration
+  ansible.builtin.template:
+    src: mediamtx.yml.j2
+    dest: /etc/mediamtx/mediamtx.yml
+    owner: "{{ traincam_user }}"
+    group: "{{ traincam_group }}"
+    mode: '0644'
+  notify: Restart mediamtx
+
+- name: Deploy mediamtx service unit
+  ansible.builtin.template:
+    src: mediamtx.service.j2
+    dest: /etc/systemd/system/mediamtx.service
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Reload systemd and restart mediamtx
+
+- name: Ensure mediamtx service enabled and started
+  ansible.builtin.systemd:
+    name: mediamtx.service
+    enabled: true
+    state: started
+
+- name: Ensure traincam service enabled and started
+  ansible.builtin.systemd:
+    name: "{{ traincam_service_name }}.service"
+    enabled: true
+    state: started
+
+- name: Create viewer web directory
+  ansible.builtin.file:
+    path: /home/{{ traincam_user }}/www
+    state: directory
+    owner: "{{ traincam_user }}"
+    group: "{{ traincam_group }}"
+    mode: '0755'
+
+- name: Deploy WebRTC viewer page
+  ansible.builtin.template:
+    src: viewer.html.j2
+    dest: /home/{{ traincam_user }}/www/viewer.html
+    owner: "{{ traincam_user }}"
+    group: "{{ traincam_group }}"
+    mode: '0644'
+
+- name: Deploy viewer http service unit
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/traincam-viewer.service
+    owner: root
+    group: root
+    mode: '0644'
+    content: |
+      [Unit]
+      Description=TrainCam static viewer (python http.server)
+      After=network-online.target
+
+      [Service]
+      Type=simple
+      User={{ traincam_user }}
+      Group={{ traincam_group }}
+      WorkingDirectory=/home/{{ traincam_user }}/www
+      ExecStart=/usr/bin/python3 -m http.server 8080 --bind 0.0.0.0
+      Restart=always
+      RestartSec=2
+
+      [Install]
+      WantedBy=multi-user.target
+  notify: Reload systemd and restart viewer
+
+- name: Ensure viewer service enabled and started
+  ansible.builtin.systemd:
+    name: traincam-viewer.service
+    enabled: true
+    state: started
+
+# NetworkManager configuration for reliable WiFi roaming
+- name: Deploy NetworkManager WiFi roaming config
+  ansible.builtin.copy:
+    dest: /etc/NetworkManager/conf.d/10-wifi-roaming.conf
+    owner: root
+    group: root
+    mode: '0644'
+    content: |
+      [connection]
+      wifi.scan-rand-mac-address=no
+
+      [device]
+      wifi.scan-interval=30
+  notify: Restart NetworkManager
+
+# Configure WiFi network priorities (traincameranet as primary)
+- name: Set traincameranet WiFi priority
+  ansible.builtin.command:
+    cmd: nmcli connection modify preconfigured connection.autoconnect-priority 5
+  changed_when: false
+  failed_when: false
+

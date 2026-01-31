@@ -1,0 +1,17 @@
+[Unit]
+Description=MediaMTX streaming server
+After=network-online.target
+Wants=network-online.target
+ConditionPathExists=/usr/local/bin/mediamtx
+
+[Service]
+Type=simple
+User={{ traincam_user }}
+Group={{ traincam_group }}
+WorkingDirectory=/home/{{ traincam_user }}
+ExecStart=/usr/local/bin/mediamtx /etc/mediamtx/mediamtx.yml
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

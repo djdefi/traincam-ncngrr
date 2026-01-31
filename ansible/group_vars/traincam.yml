@@ -1,0 +1,27 @@
+---
+# TrainCam deployment variables
+# Override per-host/group as needed.
+
+traincam_width: 1280
+traincam_height: 720
+traincam_fps: 24
+traincam_port: 8554
+traincam_awbgains: "1.00,1.12"
+
+# Optional tuning (comment out or override):
+# traincam_keyframe_interval: 48      # Defaults to fps*2 if unset
+# traincam_qp: 32                     # Lower = higher quality
+
+traincam_extra_opts: "--denoise off"
+traincam_log_dir: /var/log/traincam
+# traincam_rpi_cam_bin: /usr/bin/rpicam-vid
+
+# Latency mode (low | ultra | ultra_plus). ultra_plus gives GOP ~= FPS/4.
+LATENCY_MODE: ultra_plus
+
+traincam_service_name: traincam
+traincam_user: train
+traincam_group: train
+traincam_bin_dir: /home/train/bin
+traincam_config_dir: /etc/traincam
+traincam_unit_path: /etc/systemd/system/traincam.service
