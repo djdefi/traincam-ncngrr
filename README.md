@@ -2,8 +2,6 @@
 
 **See what the engineer sees** — a live camera feed from a model train, powered by the track.
 
-![QR Code](qr-repo.jpg)
-
 ## What Is It?
 
 A tiny camera rides on a model train and streams the engineer's view to any screen.
