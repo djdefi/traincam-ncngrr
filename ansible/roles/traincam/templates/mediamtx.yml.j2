@@ -1,13 +1,16 @@
 # MediaMTX configuration (Ansible managed)
 logLevel: info
 
+# RTSP port
+rtspAddress: :{{ traincam_port | default(8554) }}
+
 # WebRTC configuration for local network streaming
 # No STUN servers - works offline on any local network (home WiFi, mobile hotspot, etc.)
 webrtcICEServers2: []
 
 # Explicit local addresses for WebRTC peer connections
-webrtcLocalUDPAddress: :8555
-webrtcLocalTCPAddress: :8556
+webrtcLocalUDPAddress: :{{ traincam_webrtc_udp | default(8555) }}
+webrtcLocalTCPAddress: :{{ traincam_webrtc_tcp | default(8556) }}
 
 paths:
   traincam:

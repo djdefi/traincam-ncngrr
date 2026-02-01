@@ -1,18 +1,45 @@
 ---
-traincam_group: train
+# TrainCam deployment variables
+# Override per-host in inventory or host_vars as needed.
+
+# ─────────────────────────────────────────────────────────────
+# VIDEO SETTINGS
+# ─────────────────────────────────────────────────────────────
+traincam_width: 1280
+traincam_height: 720
+traincam_fps: 24
+traincam_awbgains: "1.00,1.12"
+traincam_extra_opts: "--denoise off"
+
+# Optional tuning (uncomment to override):
+# traincam_keyframe_interval: 48      # Defaults based on LATENCY_MODE
+# traincam_qp: 32                     # Lower = higher quality
+
+# Latency mode: low (~1s GOP), ultra (~0.5s), ultra_plus (~0.25s)
+LATENCY_MODE: ultra_plus
+
+# ─────────────────────────────────────────────────────────────
+# NETWORK / PORTS
+# ─────────────────────────────────────────────────────────────
+traincam_port: 8554           # RTSP port
+traincam_webrtc_port: 8889    # WebRTC WHEP
+traincam_viewer_port: 8080    # HTTP viewer
+traincam_webrtc_udp: 8555     # WebRTC local UDP
+traincam_webrtc_tcp: 8556     # WebRTC local TCP
+
+# ─────────────────────────────────────────────────────────────
+# SYSTEM PATHS
+# ─────────────────────────────────────────────────────────────
 traincam_user: train
+traincam_group: train
 traincam_service_name: traincam
 traincam_bin_dir: /home/train/bin
 traincam_config_dir: /etc/traincam
 traincam_unit_path: /etc/systemd/system/traincam.service
 traincam_log_dir: /var/log/traincam
-traincam_width: 1280
-traincam_height: 720
-traincam_fps: 24
-traincam_port: 8554
-traincam_awbgains: "1.00,1.12"
-traincam_extra_opts: ""
-# Ultra_plus latency (~0.25s GOP). Options: low (~1s), ultra (~0.5s), ultra_plus (~0.25s)
-LATENCY_MODE: ultra_plus
+
+# ─────────────────────────────────────────────────────────────
+# MEDIAMTX
+# ─────────────────────────────────────────────────────────────
 mediamtx_version: "v1.15.2"
-mediamtx_download_url: "https://github.com/bluenviron/mediamtx/releases/download/v1.15.2/mediamtx_v1.15.2_linux_arm64.tar.gz"
+mediamtx_download_url: "https://github.com/bluenviron/mediamtx/releases/download/{{ mediamtx_version }}/mediamtx_{{ mediamtx_version }}_linux_arm64.tar.gz"

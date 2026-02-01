@@ -1,0 +1,45 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Ansible
+*.retry
+.vault-pass
+vault-password.txt
+
+# Build artifacts
+*.tar.gz
+*.zip
+
+# ESP32 / Arduino
+CameraWebServer/build/
+CameraWebServer/.pio/
+
+# Test output
+tests/*.log
+tests/output/
+
+# Secrets (never commit these)
+secrets.yml
+*-secrets.yml
+*.pem
+*.key
+id_rsa*
+
+# Local development
+.env
+.env.local

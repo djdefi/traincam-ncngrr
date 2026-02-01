@@ -1,0 +1,37 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install shellcheck
+        run: sudo apt-get install -y shellcheck
+      
+      - name: Install ansible-lint
+        run: pip install ansible-lint
+      
+      - name: Run ShellCheck on scripts
+        run: |
+          find scripts tests traincam -name "*.sh" -type f | xargs shellcheck || true
+      
+      - name: Run ansible-lint
+        run: |
+          ansible-lint traincam.yml || true
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Run tests
+        run: |
+          chmod +x tests/*.sh
+          ./tests/run_tests.sh
