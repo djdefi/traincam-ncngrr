@@ -38,7 +38,7 @@ struct CameraListView: View {
                                                 .font(.system(size: 15, weight: .medium))
                                                 .frame(maxWidth: 200)
                                                 .padding(.vertical, 10)
-                                                .background(Color(red: 0.27, green: 0.67, blue: 1.0))
+                                                .background(Color.appAccent)
                                                 .foregroundColor(.white)
                                                 .clipShape(RoundedRectangle(cornerRadius: 10))
                                         }
@@ -178,7 +178,7 @@ struct AboutView: View {
                 VStack(spacing: 20) {
                     Image(systemName: "train.side.front.car")
                         .font(.system(size: 48))
-                        .foregroundColor(Color(red: 0.27, green: 0.67, blue: 1.0))
+                        .foregroundColor(.appAccent)
                     Text("RailCam")
                         .font(.title.weight(.bold))
                         .foregroundColor(.white)
@@ -193,25 +193,25 @@ struct AboutView: View {
 
                     VStack(spacing: 12) {
                         Button {
-                            openURL(URL(string: "https://djdefi.github.io/traincam-ncngrr/privacy-policy.html")!)
+                            openURL(AppURL.privacyPolicy)
                         } label: {
                             Label("Privacy Policy", systemImage: "hand.raised.fill")
                                 .frame(maxWidth: 220)
                                 .padding(.vertical, 10)
                                 .background(Color(white: 0.15))
-                                .foregroundColor(Color(red: 0.27, green: 0.67, blue: 1.0))
+                                .foregroundColor(.appAccent)
                                 .clipShape(RoundedRectangle(cornerRadius: 10))
                         }
                         .accessibilityLabel("Open privacy policy in Safari")
 
                         Button {
-                            openURL(URL(string: "https://github.com/djdefi/traincam-ncngrr")!)
+                            openURL(AppURL.sourceCode)
                         } label: {
                             Label("Source Code", systemImage: "chevron.left.forwardslash.chevron.right")
                                 .frame(maxWidth: 220)
                                 .padding(.vertical, 10)
                                 .background(Color(white: 0.15))
-                                .foregroundColor(Color(red: 0.27, green: 0.67, blue: 1.0))
+                                .foregroundColor(.appAccent)
                                 .clipShape(RoundedRectangle(cornerRadius: 10))
                         }
                         .accessibilityLabel("Open source code on GitHub")
@@ -226,7 +226,7 @@ struct AboutView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Done") { dismiss() }
-                        .foregroundColor(Color(red: 0.27, green: 0.67, blue: 1.0))
+                        .foregroundColor(.appAccent)
                 }
             }
         }
@@ -316,9 +316,9 @@ struct CameraCardView: View {
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
-            .background(Color(white: 0.12))
+            .background(Color.cardBackground)
         }
-        .background(Color(white: 0.08))
+        .background(Color.sectionBackground)
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.06), lineWidth: 0.5))
         .shadow(color: .black.opacity(0.3), radius: 8, y: 4)

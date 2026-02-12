@@ -59,14 +59,14 @@ struct SettingsView: View {
                 .accessibilityLabel("RailCam version \(appVersion)")
 
                 Button {
-                    openURL(URL(string: "https://djdefi.github.io/traincam-ncngrr/privacy-policy.html")!)
+                    openURL(AppURL.privacyPolicy)
                 } label: {
                     Label("Privacy Policy", systemImage: "hand.raised.fill")
                 }
                 .accessibilityLabel("Open privacy policy in Safari")
 
                 Button {
-                    openURL(URL(string: "https://github.com/djdefi/traincam-ncngrr")!)
+                    openURL(AppURL.sourceCode)
                 } label: {
                     Label("Source Code", systemImage: "chevron.left.forwardslash.chevron.right")
                 }

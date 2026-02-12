@@ -233,7 +233,7 @@ extension MJPEGLoader: URLSessionDataDelegate {
             print("[MJPEG] \(msg) (retry \(self.retryCount)/\(Self.maxRetries))")
 
             if self.retryCount > Self.maxRetries {
-                self.errorMessage = "Camera unavailable"
+                self.errorMessage = "Stream unavailable"
                 return
             }
 

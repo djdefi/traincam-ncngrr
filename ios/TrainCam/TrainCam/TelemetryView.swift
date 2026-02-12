@@ -114,7 +114,7 @@ struct TelemetryCard: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 6)
-        .background(Color(white: 0.1), in: RoundedRectangle(cornerRadius: 8))
+        .background(Color.surfaceBackground, in: RoundedRectangle(cornerRadius: 8))
         .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.white.opacity(0.04), lineWidth: 0.5))
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(label): \(value) \(unit)")

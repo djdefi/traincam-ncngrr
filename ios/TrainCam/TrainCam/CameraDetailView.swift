@@ -131,7 +131,7 @@ struct CameraDetailView: View {
                 Divider().overlay(Color.white.opacity(0.05))
                 InfoRow(label: "Discovery", value: camera.source.rawValue.uppercased())
             }
-            .background(Color(white: 0.1))
+            .background(Color.surfaceBackground)
             .clipShape(RoundedRectangle(cornerRadius: 10))
             .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.06), lineWidth: 0.5))
 
@@ -144,7 +144,7 @@ struct CameraDetailView: View {
                             .foregroundColor(.cyan)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 10)
-                            .background(Color(white: 0.1))
+                            .background(Color.surfaceBackground)
                             .clipShape(RoundedRectangle(cornerRadius: 8))
                             .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.cyan.opacity(0.2), lineWidth: 0.5))
                     }
@@ -157,7 +157,7 @@ struct CameraDetailView: View {
                             .foregroundColor(.cyan)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 10)
-                            .background(Color(white: 0.1))
+                            .background(Color.surfaceBackground)
                             .clipShape(RoundedRectangle(cornerRadius: 8))
                             .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.cyan.opacity(0.2), lineWidth: 0.5))
                     }
@@ -170,7 +170,7 @@ struct CameraDetailView: View {
                             .foregroundColor(.cyan)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 10)
-                            .background(Color(white: 0.1))
+                            .background(Color.surfaceBackground)
                             .clipShape(RoundedRectangle(cornerRadius: 8))
                             .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.cyan.opacity(0.2), lineWidth: 0.5))
                     }

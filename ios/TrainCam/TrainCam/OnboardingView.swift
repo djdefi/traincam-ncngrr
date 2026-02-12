@@ -6,7 +6,7 @@ struct OnboardingView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var currentPage = 0
 
-    private let accentCyan = Color(red: 0.27, green: 0.67, blue: 1.0)
+    private let accentCyan = Color.appAccent
 
     var body: some View {
         ZStack {

@@ -16,10 +16,14 @@
 		A10007 /* TelemetryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10007 /* TelemetryView.swift */; };
 		A10010 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10011 /* SettingsView.swift */; };
 		A10011 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10012 /* OnboardingView.swift */; };
+		A10012 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10013 /* Theme.swift */; };
 		A10008 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = B10009 /* PrivacyInfo.xcprivacy */; };
 		A10009 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B10010 /* Assets.xcassets */; };
 		A20001 /* CameraModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20001 /* CameraModelTests.swift */; };
 		A20002 /* CameraTelemetryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20002 /* CameraTelemetryTests.swift */; };
+		A20003 /* CameraPersistenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20003 /* CameraPersistenceTests.swift */; };
+		A20004 /* CameraDiscoveryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20004 /* CameraDiscoveryTests.swift */; };
+		A20005 /* StreamHealthTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20005 /* StreamHealthTests.swift */; };
 		A30001 /* TrainCamUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B30001 /* TrainCamUITests.swift */; };
 /* End PBXBuildFile section */
 
@@ -50,11 +54,15 @@
 		B10007 /* TelemetryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TelemetryView.swift; sourceTree = "<group>"; };
 		B10011 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		B10012 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
+		B10013 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		B10008 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		B10009 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		B10010 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		B20001 /* CameraModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraModelTests.swift; sourceTree = "<group>"; };
 		B20002 /* CameraTelemetryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraTelemetryTests.swift; sourceTree = "<group>"; };
+		B20003 /* CameraPersistenceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraPersistenceTests.swift; sourceTree = "<group>"; };
+		B20004 /* CameraDiscoveryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraDiscoveryTests.swift; sourceTree = "<group>"; };
+		B20005 /* StreamHealthTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamHealthTests.swift; sourceTree = "<group>"; };
 		B30001 /* TrainCamUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainCamUITests.swift; sourceTree = "<group>"; };
 		C10001 /* TrainCam.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TrainCam.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		C20001 /* TrainCamTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TrainCamTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -108,6 +116,7 @@
 				B10007 /* TelemetryView.swift */,
 				B10011 /* SettingsView.swift */,
 				B10012 /* OnboardingView.swift */,
+				B10013 /* Theme.swift */,
 				B10008 /* Info.plist */,
 				B10009 /* PrivacyInfo.xcprivacy */,
 				B10010 /* Assets.xcassets */,
@@ -130,6 +139,9 @@
 			children = (
 				B20001 /* CameraModelTests.swift */,
 				B20002 /* CameraTelemetryTests.swift */,
+				B20003 /* CameraPersistenceTests.swift */,
+				B20004 /* CameraDiscoveryTests.swift */,
+				B20005 /* StreamHealthTests.swift */,
 			);
 			path = TrainCamTests;
 			sourceTree = "<group>";
@@ -281,6 +293,7 @@
 				A10007 /* TelemetryView.swift in Sources */,
 				A10010 /* SettingsView.swift in Sources */,
 				A10011 /* OnboardingView.swift in Sources */,
+				A10012 /* Theme.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -290,6 +303,9 @@
 			files = (
 				A20001 /* CameraModelTests.swift in Sources */,
 				A20002 /* CameraTelemetryTests.swift in Sources */,
+				A20003 /* CameraPersistenceTests.swift in Sources */,
+				A20004 /* CameraDiscoveryTests.swift in Sources */,
+				A20005 /* StreamHealthTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
