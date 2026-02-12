@@ -163,10 +163,12 @@ final class TelemetryFetcher: ObservableObject {
                     self.telemetry = t
                     self.telemetryError = false
                 } catch {
+                    #if DEBUG
                     print("[Telemetry] Decode error for \(url): \(error)")
                     if let json = String(data: data, encoding: .utf8) {
                         print("[Telemetry] Raw JSON: \(json.prefix(500))")
                     }
+                    #endif
                     self.telemetryError = true
                 }
             } catch {

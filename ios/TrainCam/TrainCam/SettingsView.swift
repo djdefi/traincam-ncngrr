@@ -5,7 +5,9 @@ struct SettingsView: View {
     @AppStorage("connectionTimeout") private var connectionTimeout: Int = 10
     @AppStorage("autoReconnect") private var autoReconnect: Bool = true
     @AppStorage("tempUnit") private var tempUnit: String = "celsius"
+    @State private var showResetConfirmation = false
     @Environment(\.openURL) private var openURL
+    @Environment(\.dismiss) private var dismiss
 
     private var appVersion: String {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
@@ -73,8 +75,7 @@ struct SettingsView: View {
                 .accessibilityLabel("Open source code on GitHub")
 
                 Button {
-                    // Placeholder — replace with actual App Store URL when available
-                    if let url = URL(string: "https://apps.apple.com/app/id0000000000") {
+                    if let url = URL(string: "https://apps.apple.com/app/railcam/id6759075304") {
                         openURL(url)
                     }
                 } label: {
@@ -82,8 +83,33 @@ struct SettingsView: View {
                 }
                 .accessibilityLabel("Rate RailCam on the App Store")
             }
+
+            // MARK: - Data
+            Section {
+                Button(role: .destructive) {
+                    showResetConfirmation = true
+                } label: {
+                    Label("Reset App Data", systemImage: "trash")
+                        .foregroundColor(.red)
+                }
+            } header: {
+                Text("Data")
+            } footer: {
+                Text("Removes saved cameras and resets all settings.")
+            }
         }
         .navigationTitle("Settings")
         .tint(.cyan)
+        .confirmationDialog("Reset App Data?", isPresented: $showResetConfirmation, titleVisibility: .visible) {
+            Button("Reset Everything", role: .destructive) {
+                if let bundleID = Bundle.main.bundleIdentifier {
+                    UserDefaults.standard.removePersistentDomain(forName: bundleID)
+                }
+                dismiss()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This will remove all saved cameras and reset settings to defaults. This cannot be undone.")
+        }
     }
 }

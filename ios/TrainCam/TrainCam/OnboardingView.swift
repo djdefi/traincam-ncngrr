@@ -16,8 +16,9 @@ struct OnboardingView: View {
                 // Page 1: Welcome
                 VStack(spacing: 20) {
                     Spacer()
-                    Text("🚂")
-                        .font(.system(size: 72))
+                    Image(systemName: "video.fill")
+                        .font(.system(size: 64))
+                        .foregroundColor(.appAccent)
                     Text("Welcome to RailCam")
                         .font(.largeTitle.weight(.bold))
                         .foregroundColor(.white)

@@ -66,9 +66,13 @@ final class CameraDiscovery: NSObject, ObservableObject {
         browser?.stateUpdateHandler = { state in
             switch state {
             case .ready:
+                #if DEBUG
                 print("[mDNS] Browsing for _traincam._tcp")
+                #endif
             case .failed(let error):
+                #if DEBUG
                 print("[mDNS] Browse failed: \(error)")
+                #endif
             default:
                 break
             }
@@ -144,6 +148,14 @@ final class CameraDiscovery: NSObject, ObservableObject {
     // MARK: - BLE Discovery
 
     func startBLE() {
+        // Skip BLE if Bluetooth permission was denied or restricted — BLE is optional
+        let auth = CBCentralManager.authorization
+        if auth == .denied || auth == .restricted {
+            #if DEBUG
+            print("[BLE] Skipping — Bluetooth not authorized")
+            #endif
+            return
+        }
         centralManager = CBCentralManager(delegate: self, queue: nil)
         // Stop BLE scanning after 15 seconds to save battery
         bleScanTask?.cancel()
@@ -151,7 +163,9 @@ final class CameraDiscovery: NSObject, ObservableObject {
             try? await Task.sleep(for: .seconds(15))
             guard !Task.isCancelled else { return }
             self?.centralManager?.stopScan()
+            #if DEBUG
             print("[BLE] Scan stopped (15s timeout)")
+            #endif
         }
     }
 
@@ -292,7 +306,9 @@ extension CameraDiscovery: CBCentralManagerDelegate {
                 withServices: [CBUUID(string: "181A")],
                 options: [CBCentralManagerScanOptionAllowDuplicatesKey: false]
             )
+            #if DEBUG
             print("[BLE] Scanning for TrainCam beacons (0x181A)")
+            #endif
         }
     }
 
@@ -300,7 +316,9 @@ extension CameraDiscovery: CBCentralManagerDelegate {
                          advertisementData: [String: Any], rssi RSSI: NSNumber) {
         guard let name = peripheral.name ?? advertisementData[CBAdvertisementDataLocalNameKey] as? String,
               name.contains("traincam") else { return }
+        #if DEBUG
         print("[BLE] Found: \(name) RSSI=\(RSSI)")
+        #endif
         // BLE gives us the name; we still need to resolve the IP via mDNS or connect to GATT
         // For now, add a placeholder that mDNS will fill with the real IP
     }

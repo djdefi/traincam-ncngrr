@@ -230,7 +230,9 @@ extension MJPEGLoader: URLSessionDataDelegate {
 
             self.retryCount += 1
             let msg = error?.localizedDescription ?? "Stream ended"
+            #if DEBUG
             print("[MJPEG] \(msg) (retry \(self.retryCount)/\(Self.maxRetries))")
+            #endif
 
             if self.retryCount > Self.maxRetries {
                 self.errorMessage = "Stream unavailable"
