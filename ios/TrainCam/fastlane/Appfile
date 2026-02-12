@@ -1,0 +1,5 @@
+app_identifier("com.railcam.app")
+apple_id(ENV["FASTLANE_APPLE_ID"] || "")
+team_id("692L4TX734")
+
+itc_team_id(ENV["FASTLANE_ITC_TEAM_ID"] || "")

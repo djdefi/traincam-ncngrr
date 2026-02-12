@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RailCam — Privacy Policy</title>
+  <style>
+    :root {
+      --bg: #121212;
+      --surface: #1e1e1e;
+      --text: #e0e0e0;
+      --text-muted: #9e9e9e;
+      --accent: #6ec1e4;
+      --border: #2c2c2c;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.7;
+      padding: 2rem 1rem;
+    }
+
+    .container {
+      max-width: 720px;
+      margin: 0 auto;
+    }
+
+    header { margin-bottom: 2.5rem; }
+
+    h1 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      margin-bottom: 0.25rem;
+    }
+
+    .subtitle {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+    }
+
+    h2 {
+      font-size: 1.2rem;
+      font-weight: 600;
+      margin-top: 2rem;
+      margin-bottom: 0.75rem;
+      padding-bottom: 0.35rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    p, ul { margin-bottom: 1rem; }
+
+    ul {
+      padding-left: 1.25rem;
+    }
+
+    li { margin-bottom: 0.35rem; }
+
+    a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    a:hover { text-decoration: underline; }
+
+    .highlight {
+      background: var(--surface);
+      border-left: 3px solid var(--accent);
+      padding: 1rem 1.25rem;
+      border-radius: 4px;
+      margin-bottom: 1rem;
+    }
+
+    footer {
+      margin-top: 3rem;
+      padding-top: 1.5rem;
+      border-top: 1px solid var(--border);
+      color: var(--text-muted);
+      font-size: 0.85rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>RailCam Privacy Policy</h1>
+      <p class="subtitle">Effective date: January 1, 2026</p>
+    </header>
+
+    <div class="highlight">
+      <strong>The short version:</strong> RailCam does not collect, store, or transmit any personal data. Everything stays on your local network.
+    </div>
+
+    <h2>About RailCam</h2>
+    <p>RailCam is a free iOS app for viewing live camera streams from TrainCam cameras on your local WiFi network. It is designed to work entirely offline with no cloud services, no accounts, and no tracking of any kind.</p>
+
+    <h2>What Data We Collect</h2>
+    <p><strong>None.</strong> RailCam collects:</p>
+    <ul>
+      <li>No personal information</li>
+      <li>No usage analytics</li>
+      <li>No crash telemetry</li>
+      <li>No advertising identifiers</li>
+      <li>No location data</li>
+      <li>No cookies or tracking pixels</li>
+    </ul>
+    <p>There are no accounts to create and no sign-in of any kind.</p>
+
+    <h2>Local Network Access</h2>
+    <p>RailCam requires access to your local network to discover and connect to camera devices. Specifically, the app uses:</p>
+    <ul>
+      <li><strong>Bonjour / mDNS</strong> — to discover TrainCam camera devices advertising the <code>_traincam._tcp</code> service on your local network.</li>
+      <li><strong>HTTP / WebRTC</strong> — to receive live video streams from discovered cameras.</li>
+    </ul>
+    <p>All network communication occurs exclusively on your local WiFi network. No data is sent to any external server, cloud service, or third party.</p>
+
+    <h2>Bluetooth Access</h2>
+    <p>RailCam uses Bluetooth Low Energy (BLE) to discover nearby TrainCam camera devices. Bluetooth is used solely for local device discovery and communication. No Bluetooth data is recorded, stored, or transmitted outside the app.</p>
+
+    <h2>Third-Party Services</h2>
+    <p><strong>None.</strong> RailCam does not include any third-party SDKs, analytics frameworks, advertising libraries, or external services. The app is entirely self-contained.</p>
+
+    <h2>Children's Privacy</h2>
+    <p>RailCam does not collect any data from anyone, including children. Because no personal information is gathered, the app is safe for users of all ages. We comply with the Children's Online Privacy Protection Act (COPPA) and similar regulations by virtue of collecting no data whatsoever.</p>
+
+    <h2>Changes to This Policy</h2>
+    <p>If we ever update this privacy policy, the changes will be posted on this page with an updated effective date. Since RailCam collects no data, we do not anticipate material changes to this policy.</p>
+
+    <h2>Contact</h2>
+    <p>If you have questions about this privacy policy, please open an issue on the <a href="https://github.com/djdefi/traincam-ncngrr" rel="noopener noreferrer">TrainCam GitHub repository</a>.</p>
+
+    <footer>
+      <p>&copy; 2026 RailCam. All rights reserved.</p>
+    </footer>
+  </div>
+</body>
+</html>

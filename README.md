@@ -59,6 +59,7 @@ traincam-ncngrr/
 │   ├── HARDWARE.md       # Power chain details
 │   ├── NETWORK.md        # WiFi, ports, mDNS
 │   └── PRINTABLE_HANDOUT.md  # One-page handout for demos
+├── ios/                  # Native iOS viewer app (SwiftUI)
 ├── tests/                # Automated tests
 └── traincam.yml          # Main Ansible playbook
 ```
@@ -87,6 +88,28 @@ traincam_height: 720
 traincam_fps: 24
 LATENCY_MODE: ultra_plus  # Options: low (~1s), ultra (~0.5s), ultra_plus (~0.25s)
 ```
+
+## iOS App
+
+The **RailCam** iOS app is a native SwiftUI viewer for TrainCam streams.
+
+- **Auto-discovery** of cameras via mDNS and Bluetooth
+- **MJPEG streaming** from ESP32 cameras
+- **WebRTC/WHEP streaming** from Raspberry Pi cameras
+- **Real-time telemetry** and manual camera entry
+
+**Requirements:** iOS 17.0+, iPhone
+
+**Build from source:**
+
+```bash
+open ios/TrainCam/TrainCam.xcodeproj
+# Build and run in Xcode
+```
+
+**App Store:** Search for "RailCam" — coming soon.
+
+**Privacy:** See [Privacy Policy](docs/privacy-policy.html).
 
 ## Development
 

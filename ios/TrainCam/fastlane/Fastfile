@@ -1,0 +1,87 @@
+default_platform(:ios)
+
+PROJECT = "TrainCam.xcodeproj"
+SCHEME = "TrainCam"
+ASC_KEY_PATH = "/Users/djdefi/src/traincam-ncngrr/ios/TrainCam/fastlane/AuthKey.p8"
+ASC_API_KEY = {
+  key_id: "3NKZXWRPKF",
+  issuer_id: "e516f455-9338-4c9c-a037-d7fbb714f0b6",
+  key_filepath: ASC_KEY_PATH,
+  in_house: false
+}
+
+platform :ios do
+
+  desc "Run unit tests"
+  lane :test do
+    run_tests(
+      project: PROJECT,
+      scheme: SCHEME,
+      devices: ["iPhone 16 Pro"],
+      only_testing: ["TrainCamTests"]
+    )
+  end
+
+  desc "Create the app on App Store Connect (run once)"
+  lane :create_app do
+    produce(
+      app_name: "RailCam",
+      language: "English",
+      app_version: "1.0",
+      sku: "railcam-v1",
+      platform: "ios",
+      enable_services: {},
+      api_key: app_store_connect_api_key(**ASC_API_KEY)
+    )
+  end
+
+  desc "Upload screenshots and metadata to App Store Connect"
+  lane :metadata do
+    deliver(
+      api_key: app_store_connect_api_key(**ASC_API_KEY),
+      skip_binary_upload: true,
+      skip_screenshots: false,
+      force: true,
+      metadata_path: "./fastlane/metadata",
+      screenshots_path: "../screenshots",
+      overwrite_screenshots: true,
+      app_rating_config_path: "./fastlane/rating_config.json",
+      precheck_include_in_app_purchases: false,
+      submission_information: {
+        add_id_info_uses_idfa: false
+      }
+    )
+  end
+
+  desc "Build, archive, and upload to App Store Connect"
+  lane :release do
+    api_key = app_store_connect_api_key(**ASC_API_KEY)
+
+    increment_build_number(xcodeproj: PROJECT)
+
+    build_app(
+      project: PROJECT,
+      scheme: SCHEME,
+      export_method: "app-store",
+      output_directory: "./build",
+      clean: true
+    )
+
+    upload_to_app_store(
+      api_key: api_key,
+      skip_metadata: true,
+      skip_screenshots: true,
+      force: true,
+      precheck_include_in_app_purchases: false
+    )
+  end
+
+  desc "Full pipeline: metadata + build + upload + submit"
+  lane :ship do
+    test
+    metadata
+    release
+    UI.success "🚂 RailCam is submitted for review!"
+  end
+
+end

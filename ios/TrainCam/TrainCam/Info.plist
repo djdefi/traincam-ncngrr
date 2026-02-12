@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>TrainCam discovers cameras on your local network using Bonjour.</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_traincam._tcp</string>
+		<string>_http._tcp</string>
+	</array>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>TrainCam uses Bluetooth to discover nearby cameras.</string>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
+</dict>
+</plist>

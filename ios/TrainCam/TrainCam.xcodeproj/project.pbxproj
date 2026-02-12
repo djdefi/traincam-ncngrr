@@ -1,0 +1,592 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		A10001 /* TrainCamApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001 /* TrainCamApp.swift */; };
+		A10002 /* Camera.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10002 /* Camera.swift */; };
+		A10003 /* CameraDiscovery.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10003 /* CameraDiscovery.swift */; };
+		A10004 /* CameraListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10004 /* CameraListView.swift */; };
+		A10005 /* CameraDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10005 /* CameraDetailView.swift */; };
+		A10006 /* MJPEGStreamView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10006 /* MJPEGStreamView.swift */; };
+		A10007 /* TelemetryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10007 /* TelemetryView.swift */; };
+		A10008 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = B10009 /* PrivacyInfo.xcprivacy */; };
+		A10009 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B10010 /* Assets.xcassets */; };
+		A20001 /* CameraModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20001 /* CameraModelTests.swift */; };
+		A20002 /* CameraTelemetryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20002 /* CameraTelemetryTests.swift */; };
+		A30001 /* TrainCamUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B30001 /* TrainCamUITests.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		T20002 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = H10001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = F10001;
+			remoteInfo = TrainCam;
+		};
+		T30002 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = H10001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = F10001;
+			remoteInfo = TrainCam;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		B10001 /* TrainCamApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainCamApp.swift; sourceTree = "<group>"; };
+		B10002 /* Camera.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Camera.swift; sourceTree = "<group>"; };
+		B10003 /* CameraDiscovery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraDiscovery.swift; sourceTree = "<group>"; };
+		B10004 /* CameraListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraListView.swift; sourceTree = "<group>"; };
+		B10005 /* CameraDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraDetailView.swift; sourceTree = "<group>"; };
+		B10006 /* MJPEGStreamView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MJPEGStreamView.swift; sourceTree = "<group>"; };
+		B10007 /* TelemetryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TelemetryView.swift; sourceTree = "<group>"; };
+		B10008 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		B10009 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		B10010 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		B20001 /* CameraModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraModelTests.swift; sourceTree = "<group>"; };
+		B20002 /* CameraTelemetryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraTelemetryTests.swift; sourceTree = "<group>"; };
+		B30001 /* TrainCamUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainCamUITests.swift; sourceTree = "<group>"; };
+		C10001 /* TrainCam.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TrainCam.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		C20001 /* TrainCamTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TrainCamTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		C30001 /* TrainCamUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TrainCamUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		D10001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D20001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D30001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		E10001 = {
+			isa = PBXGroup;
+			children = (
+				E10002 /* TrainCam */,
+				E20001 /* TrainCamTests */,
+				E30001 /* TrainCamUITests */,
+				E10003 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		E10002 /* TrainCam */ = {
+			isa = PBXGroup;
+			children = (
+				B10001 /* TrainCamApp.swift */,
+				B10002 /* Camera.swift */,
+				B10003 /* CameraDiscovery.swift */,
+				B10004 /* CameraListView.swift */,
+				B10005 /* CameraDetailView.swift */,
+				B10006 /* MJPEGStreamView.swift */,
+				B10007 /* TelemetryView.swift */,
+				B10008 /* Info.plist */,
+				B10009 /* PrivacyInfo.xcprivacy */,
+				B10010 /* Assets.xcassets */,
+			);
+			path = TrainCam;
+			sourceTree = "<group>";
+		};
+		E10003 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				C10001 /* TrainCam.app */,
+				C20001 /* TrainCamTests.xctest */,
+				C30001 /* TrainCamUITests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		E20001 /* TrainCamTests */ = {
+			isa = PBXGroup;
+			children = (
+				B20001 /* CameraModelTests.swift */,
+				B20002 /* CameraTelemetryTests.swift */,
+			);
+			path = TrainCamTests;
+			sourceTree = "<group>";
+		};
+		E30001 /* TrainCamUITests */ = {
+			isa = PBXGroup;
+			children = (
+				B30001 /* TrainCamUITests.swift */,
+			);
+			path = TrainCamUITests;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		F10001 /* TrainCam */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = G10003 /* Build configuration list for PBXNativeTarget "TrainCam" */;
+			buildPhases = (
+				F10002 /* Sources */,
+				D10001 /* Frameworks */,
+				F10003 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = TrainCam;
+			productName = TrainCam;
+			productReference = C10001 /* TrainCam.app */;
+			productType = "com.apple.product-type.application";
+		};
+		F20001 /* TrainCamTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = G20003 /* Build configuration list for PBXNativeTarget "TrainCamTests" */;
+			buildPhases = (
+				F20002 /* Sources */,
+				D20001 /* Frameworks */,
+				F20003 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				T20001 /* PBXTargetDependency */,
+			);
+			name = TrainCamTests;
+			productName = TrainCamTests;
+			productReference = C20001 /* TrainCamTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		F30001 /* TrainCamUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = G30003 /* Build configuration list for PBXNativeTarget "TrainCamUITests" */;
+			buildPhases = (
+				F30002 /* Sources */,
+				D30001 /* Frameworks */,
+				F30003 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				T30001 /* PBXTargetDependency */,
+			);
+			name = TrainCamUITests;
+			productName = TrainCamUITests;
+			productReference = C30001 /* TrainCamUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		H10001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1520;
+				LastUpgradeCheck = 2620;
+				TargetAttributes = {
+					F10001 = {
+						CreatedOnToolsVersion = 15.2;
+					};
+					F20001 = {
+						CreatedOnToolsVersion = 15.2;
+						TestTargetID = F10001;
+					};
+					F30001 = {
+						CreatedOnToolsVersion = 15.2;
+						TestTargetID = F10001;
+					};
+				};
+			};
+			buildConfigurationList = G10001 /* Build configuration list for PBXProject "TrainCam" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = E10001;
+			productRefGroup = E10003 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				F10001 /* TrainCam */,
+				F20001 /* TrainCamTests */,
+				F30001 /* TrainCamUITests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		F10003 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A10008 /* PrivacyInfo.xcprivacy in Resources */,
+				A10009 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F20003 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F30003 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		F10002 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A10001 /* TrainCamApp.swift in Sources */,
+				A10002 /* Camera.swift in Sources */,
+				A10003 /* CameraDiscovery.swift in Sources */,
+				A10004 /* CameraListView.swift in Sources */,
+				A10005 /* CameraDetailView.swift in Sources */,
+				A10006 /* MJPEGStreamView.swift in Sources */,
+				A10007 /* TelemetryView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F20002 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A20001 /* CameraModelTests.swift in Sources */,
+				A20002 /* CameraTelemetryTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F30002 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A30001 /* TrainCamUITests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		T20001 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = F10001 /* TrainCam */;
+			targetProxy = T20002 /* PBXContainerItemProxy */;
+		};
+		T30001 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = F10001 /* TrainCam */;
+			targetProxy = T30002 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		G10002 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = 692L4TX734;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) DEBUG";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		G10004 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = 692L4TX734;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MTL_FAST_MATH = YES;
+				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		G10005 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = TrainCam/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = RailCam;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.railcam.app;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		G10006 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = TrainCam/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = RailCam;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.railcam.app;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+		G20001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.railcam.app.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/TrainCam.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/TrainCam";
+			};
+			name = Debug;
+		};
+		G20002 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.railcam.app.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/TrainCam.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/TrainCam";
+			};
+			name = Release;
+		};
+		G30001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.railcam.app.uitests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_TARGET_NAME = TrainCam;
+			};
+			name = Debug;
+		};
+		G30002 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.railcam.app.uitests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_TARGET_NAME = TrainCam;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		G10001 /* Build configuration list for PBXProject "TrainCam" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				G10002 /* Debug */,
+				G10004 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		G10003 /* Build configuration list for PBXNativeTarget "TrainCam" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				G10005 /* Debug */,
+				G10006 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		G20003 /* Build configuration list for PBXNativeTarget "TrainCamTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				G20001 /* Debug */,
+				G20002 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		G30003 /* Build configuration list for PBXNativeTarget "TrainCamUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				G30001 /* Debug */,
+				G30002 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = H10001 /* Project object */;
+}

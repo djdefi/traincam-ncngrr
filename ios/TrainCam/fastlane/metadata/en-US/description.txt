@@ -1,0 +1,25 @@
+Turn your model railroad into a live broadcast. RailCam lets you view real-time video from tiny cameras mounted on moving trains — all over local WiFi, with no cloud services or accounts required.
+
+Whether you're running an ESP32 camera car or a Raspberry Pi streaming rig, RailCam discovers your cameras automatically and connects in seconds.
+
+FEATURES
+
+• Auto-Discovery — Finds TrainCam cameras on your network via Bonjour (mDNS) and Bluetooth LE
+• Dual Camera Support — ESP32 cameras (MJPEG) and Raspberry Pi cameras (WebRTC/WHEP)
+• Real-Time Telemetry — Monitor signal strength, temperature, memory usage, and uptime
+• Manual Connection — Add any camera by IP address
+• Zero Configuration — No accounts, no cloud, no subscriptions
+• Dark Theme — Designed for layout rooms and train shows
+
+HOW IT WORKS
+
+Mount a small camera on your train and connect it to your local WiFi network. RailCam finds the camera, connects directly over your LAN, and streams video to your iPhone. Everything stays on your network — no cloud, no subscriptions, no tracking.
+
+COMPATIBLE HARDWARE
+
+• ESP32-S3 XIAO Sense with camera module (MJPEG streaming)
+• Raspberry Pi Zero W or later with rpicam-vid and MediaMTX (WebRTC streaming)
+
+RailCam also works with any standard MJPEG stream source or WebRTC/WHEP-compatible server.
+
+Download RailCam and see your layout from a whole new perspective.
