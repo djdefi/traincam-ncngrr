@@ -2,10 +2,10 @@ default_platform(:ios)
 
 PROJECT = "TrainCam.xcodeproj"
 SCHEME = "TrainCam"
-ASC_KEY_PATH = "/Users/djdefi/src/traincam-ncngrr/ios/TrainCam/fastlane/AuthKey.p8"
+ASC_KEY_PATH = File.join(Dir.home, ".appstoreconnect", "private_keys", "AuthKey_#{ENV.fetch('ASC_KEY_ID', 'CHANGEME')}.p8")
 ASC_API_KEY = {
-  key_id: "3NKZXWRPKF",
-  issuer_id: "e516f455-9338-4c9c-a037-d7fbb714f0b6",
+  key_id: ENV.fetch("ASC_KEY_ID", "CHANGEME"),
+  issuer_id: ENV.fetch("ASC_ISSUER_ID", "CHANGEME"),
   key_filepath: ASC_KEY_PATH,
   in_house: false
 }
@@ -64,7 +64,12 @@ platform :ios do
       scheme: SCHEME,
       export_method: "app-store",
       output_directory: "./build",
-      clean: true
+      clean: true,
+      xcargs: "-allowProvisioningUpdates -authenticationKeyPath '#{ASC_KEY_PATH}' -authenticationKeyID '#{ENV.fetch('ASC_KEY_ID', 'CHANGEME')}' -authenticationKeyIssuerID '#{ENV.fetch('ASC_ISSUER_ID', 'CHANGEME')}'",
+      export_options: {
+        signingStyle: "automatic",
+        teamID: "692L4TX734"
+      }
     )
 
     upload_to_app_store(

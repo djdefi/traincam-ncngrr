@@ -1,7 +1,7 @@
-# Fastlane secrets
+# API keys and secrets
 *.p8
 asc_key.json
-report.xml
 
 # Build artifacts
-build/
+report.xml
+README.md

@@ -1,1 +1,5 @@
+# Xcode user data
 xcuserdata/
+
+# Build output
+build/
