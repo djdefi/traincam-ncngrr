@@ -3,9 +3,8 @@ import SwiftUI
 /// Main screen: shows all discovered cameras in a scrollable list.
 struct CameraListView: View {
     @EnvironmentObject var discovery: CameraDiscovery
-    @Environment(\.openURL) private var openURL
     @State private var showManualAdd = false
-    @State private var showAbout = false
+    @State private var showSettings = false
     @State private var manualIP = ""
 
     var body: some View {
@@ -89,6 +88,15 @@ struct CameraListView: View {
                             ))
                             .accessibilityLabel("Camera: \(camera.name) at \(camera.ip)")
                             .accessibilityHint("Double tap to view live stream")
+                            .contextMenu {
+                                if camera.source == .manual {
+                                    Button(role: .destructive) {
+                                        discovery.removeManualCamera(camera)
+                                    } label: {
+                                        Label("Remove Saved Camera", systemImage: "trash")
+                                    }
+                                }
+                            }
                         }
                     }
                     .padding()
@@ -99,11 +107,11 @@ struct CameraListView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button {
-                        showAbout = true
+                        showSettings = true
                     } label: {
-                        Image(systemName: "info.circle")
+                        Image(systemName: "gearshape")
                     }
-                    .accessibilityLabel("About RailCam")
+                    .accessibilityLabel("Settings")
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
@@ -139,8 +147,16 @@ struct CameraListView: View {
             .refreshable {
                 await discovery.refreshAsync()
             }
-            .sheet(isPresented: $showAbout) {
-                AboutView(openURL: openURL)
+            .sheet(isPresented: $showSettings) {
+                NavigationStack {
+                    SettingsView()
+                        .toolbar {
+                            ToolbarItem(placement: .topBarTrailing) {
+                                Button("Done") { showSettings = false }
+                                    .foregroundColor(.cyan)
+                            }
+                        }
+                }
             }
         }
     }
@@ -222,6 +238,9 @@ struct AboutView: View {
 struct CameraCardView: View {
     let camera: Camera
     @StateObject private var fetcher = TelemetryFetcher()
+    @AppStorage("tempUnit") private var tempUnit: String = "celsius"
+
+    private var useFahrenheit: Bool { tempUnit == "fahrenheit" }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -271,10 +290,10 @@ struct CameraCardView: View {
                                 .foregroundColor(rssi > -50 ? .green : rssi > -70 ? .orange : .red)
                                 .accessibilityLabel("Wi-Fi signal \(rssi) dBm")
                         }
-                        Label(String(format: "%.0f\u{00B0}F", t.temperature_f), systemImage: "thermometer.medium")
+                        Label(String(format: "%.0f\u{00B0}%@", useFahrenheit ? t.temperature_f : t.temperature_c, useFahrenheit ? "F" : "C"), systemImage: "thermometer.medium")
                             .font(.system(size: 10))
                             .foregroundColor(t.temperature_c < 55 ? .white : .red)
-                            .accessibilityLabel("Temperature \(String(format: "%.0f", t.temperature_f)) degrees Fahrenheit")
+                            .accessibilityLabel("Temperature \(String(format: "%.0f", useFahrenheit ? t.temperature_f : t.temperature_c)) degrees \(useFahrenheit ? "Fahrenheit" : "Celsius")")
                     }
                 } else {
                     ProgressView()
@@ -284,7 +303,7 @@ struct CameraCardView: View {
                 }
 
                 HStack(spacing: 8) {
-                    Image(systemName: camera.source == .ble ? "antenna.radiowaves.left.and.right" : "bonjour")
+                    Image(systemName: camera.source == .ble ? "antenna.radiowaves.left.and.right" : camera.source == .manual ? "hand.raised.fill" : "bonjour")
                         .font(.system(size: 10))
                         .foregroundColor(.gray.opacity(0.5))
                         .accessibilityLabel("Discovered via \(camera.source.rawValue)")

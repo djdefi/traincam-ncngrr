@@ -1,7 +1,7 @@
 import Foundation
 
 /// Represents a discovered TrainCam camera on the network.
-struct Camera: Identifiable, Hashable, Sendable {
+struct Camera: Identifiable, Hashable, Sendable, Codable {
     let id: String          // IP address or unique key
     let name: String        // e.g. "traincam-esp1"
     let host: String        // e.g. "traincam-esp1.local"
@@ -10,11 +10,11 @@ struct Camera: Identifiable, Hashable, Sendable {
     var source: DiscoverySource
     var cameraType: CameraType
 
-    enum DiscoverySource: String, Hashable, Sendable {
+    enum DiscoverySource: String, Hashable, Sendable, Codable {
         case mdns, ble, manual
     }
 
-    enum CameraType: String, Hashable, Sendable {
+    enum CameraType: String, Hashable, Sendable, Codable {
         case esp32
         case pi
     }

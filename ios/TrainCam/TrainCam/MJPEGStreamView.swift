@@ -9,11 +9,38 @@ struct MJPEGStreamView: View {
     var body: some View {
         Group {
             if let image = loader.image {
-                Image(uiImage: image)
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-                    .transition(.opacity.animation(.easeIn(duration: 0.2)))
-                    .accessibilityLabel("Live camera stream")
+                ZStack {
+                    Image(uiImage: image)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .transition(.opacity.animation(.easeIn(duration: 0.2)))
+                        .accessibilityLabel("Live camera stream")
+
+                    if loader.isStalled {
+                        Color.black.opacity(0.6)
+                        VStack(spacing: 8) {
+                            Image(systemName: "exclamationmark.triangle")
+                                .font(.system(size: 24))
+                                .foregroundColor(.orange)
+                            Text("Stream stalled")
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundColor(.white)
+                            Button {
+                                loader.start(url: url)
+                            } label: {
+                                Text("Reconnect")
+                                    .font(.system(size: 14, weight: .medium))
+                                    .foregroundColor(.cyan)
+                                    .padding(.horizontal, 20)
+                                    .padding(.vertical, 6)
+                                    .background(Color.cyan.opacity(0.12))
+                                    .clipShape(Capsule())
+                            }
+                        }
+                        .accessibilityElement(children: .combine)
+                        .accessibilityLabel("Stream stalled. Reconnect button available.")
+                    }
+                }
             } else if loader.errorMessage != nil {
                 ZStack {
                     Color.black
@@ -63,6 +90,7 @@ struct MJPEGStreamView: View {
 final class MJPEGLoader: NSObject, ObservableObject {
     @Published var image: UIImage?
     @Published var errorMessage: String?
+    @Published var isStalled = false
 
     private var session: URLSession?
     private var task: URLSessionDataTask?
@@ -71,15 +99,24 @@ final class MJPEGLoader: NSObject, ObservableObject {
     private let jpegEnd = Data([0xFF, 0xD9])
     private var retryCount = 0
     private var stopped = false
+    private var lastFrameTime: Date?
+    private var watchdogTask: Task<Void, Never>?
+    private var currentURL: URL?
     private static let maxRetries = 3
     private static let maxBufferSize = 2 * 1024 * 1024 // 2 MB
+    private static let stallThreshold: TimeInterval = 10
+    private static let autoRetryDelay: TimeInterval = 3
 
     func start(url: URL) {
         stop()
         stopped = false
         retryCount = 0
         errorMessage = nil
+        isStalled = false
+        lastFrameTime = nil
+        currentURL = url
         connect(url: url)
+        startWatchdog()
     }
 
     private func connect(url: URL) {
@@ -96,11 +133,42 @@ final class MJPEGLoader: NSObject, ObservableObject {
 
     func stop() {
         stopped = true
+        watchdogTask?.cancel()
+        watchdogTask = nil
         task?.cancel()
         session?.invalidateAndCancel()
         task = nil
         session = nil
         buffer = Data()
+    }
+
+    private func startWatchdog() {
+        watchdogTask?.cancel()
+        watchdogTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(5))
+                guard !Task.isCancelled, let self, !self.stopped else { return }
+                if let lastFrame = self.lastFrameTime,
+                   Date().timeIntervalSince(lastFrame) >= Self.stallThreshold,
+                   self.image != nil {
+                    self.isStalled = true
+                    // Auto-retry after showing indicator
+                    try? await Task.sleep(for: .seconds(Self.autoRetryDelay))
+                    guard !Task.isCancelled, !self.stopped, self.isStalled,
+                          let url = self.currentURL else { return }
+                    self.reconnect(url: url)
+                }
+            }
+        }
+    }
+
+    private func reconnect(url: URL) {
+        session?.invalidateAndCancel()
+        session = nil
+        buffer = Data()
+        isStalled = false
+        lastFrameTime = nil
+        connect(url: url)
     }
 
     private func extractFrames() {
@@ -122,6 +190,8 @@ final class MJPEGLoader: NSObject, ObservableObject {
 
             if let img = UIImage(data: frameData) {
                 self.image = img
+                self.lastFrameTime = Date()
+                self.isStalled = false
             }
         }
     }
@@ -136,6 +206,7 @@ extension MJPEGLoader: URLSessionDataDelegate {
         Task { @MainActor [weak self] in
             self?.retryCount = 0
             self?.errorMessage = nil
+            self?.lastFrameTime = Date()
         }
         completionHandler(.allow)
     }

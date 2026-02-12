@@ -67,7 +67,7 @@ struct CameraDetailView: View {
     private var piStreamSection: some View {
         if let url = camera.playerURL {
             ZStack(alignment: .topLeading) {
-                WebRTCViewerView(url: url)
+                WebRTCPlayerView(url: url)
                     .aspectRatio(16/9, contentMode: .fit)
                     .clipShape(RoundedRectangle(cornerRadius: 2))
                     .accessibilityLabel("Live WebRTC stream from \(camera.name)")
@@ -227,10 +227,87 @@ struct FullscreenStreamView: View {
     }
 }
 
+/// SwiftUI wrapper for WebRTC stream with loading, error, and timeout states.
+struct WebRTCPlayerView: View {
+    let url: URL
+    @State private var isLoading = true
+    @State private var hasError = false
+    @State private var reloadID = UUID()
+    @State private var timeoutTask: Task<Void, Never>?
+
+    var body: some View {
+        ZStack {
+            Color.black
+
+            WebRTCViewerView(
+                url: url,
+                isLoading: $isLoading,
+                hasError: $hasError,
+                reloadID: reloadID
+            )
+            .opacity(hasError ? 0 : 1)
+
+            if isLoading && !hasError {
+                ProgressView()
+                    .tint(.cyan)
+                    .scaleEffect(1.2)
+            }
+
+            if hasError {
+                VStack(spacing: 16) {
+                    Image(systemName: "exclamationmark.triangle")
+                        .font(.system(size: 36))
+                        .foregroundColor(.cyan)
+                    Text("Stream unavailable")
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundColor(.white)
+                    Button {
+                        hasError = false
+                        isLoading = true
+                        reloadID = UUID()
+                        startTimeout()
+                    } label: {
+                        Text("Retry")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(.black)
+                            .padding(.horizontal, 24)
+                            .padding(.vertical, 8)
+                            .background(.cyan)
+                            .clipShape(Capsule())
+                    }
+                    .accessibilityLabel("Retry loading stream")
+                }
+            }
+        }
+        .onAppear { startTimeout() }
+        .onDisappear { timeoutTask?.cancel() }
+        .onChange(of: isLoading) { _, newValue in
+            if !newValue && !hasError { timeoutTask?.cancel() }
+        }
+    }
+
+    private func startTimeout() {
+        timeoutTask?.cancel()
+        timeoutTask = Task {
+            try? await Task.sleep(nanoseconds: 15_000_000_000)
+            guard !Task.isCancelled else { return }
+            hasError = true
+            isLoading = false
+        }
+    }
+}
+
 /// Embedded WKWebView for Pi WebRTC stream via WHEP.
 /// Loads the /player endpoint served by the Pi's discovery server.
 struct WebRTCViewerView: UIViewRepresentable {
     let url: URL
+    @Binding var isLoading: Bool
+    @Binding var hasError: Bool
+    let reloadID: UUID
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(isLoading: $isLoading, hasError: $hasError, reloadID: reloadID)
+    }
 
     func makeUIView(context: Context) -> WKWebView {
         let config = WKWebViewConfiguration()
@@ -241,9 +318,41 @@ struct WebRTCViewerView: UIViewRepresentable {
         webView.backgroundColor = .black
         webView.scrollView.backgroundColor = .black
         webView.scrollView.isScrollEnabled = false
+        webView.navigationDelegate = context.coordinator
         webView.load(URLRequest(url: url))
         return webView
     }
 
-    func updateUIView(_ webView: WKWebView, context: Context) {}
+    func updateUIView(_ webView: WKWebView, context: Context) {
+        if context.coordinator.lastReloadID != reloadID {
+            context.coordinator.lastReloadID = reloadID
+            webView.load(URLRequest(url: url))
+        }
+    }
+
+    class Coordinator: NSObject, WKNavigationDelegate {
+        @Binding var isLoading: Bool
+        @Binding var hasError: Bool
+        var lastReloadID: UUID
+
+        init(isLoading: Binding<Bool>, hasError: Binding<Bool>, reloadID: UUID) {
+            _isLoading = isLoading
+            _hasError = hasError
+            lastReloadID = reloadID
+        }
+
+        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+            isLoading = false
+        }
+
+        func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+            isLoading = false
+            hasError = true
+        }
+
+        func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+            isLoading = false
+            hasError = true
+        }
+    }
 }

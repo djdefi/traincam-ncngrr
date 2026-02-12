@@ -10,6 +10,7 @@ final class CameraDiscovery: NSObject, ObservableObject {
     @Published var cameras: [Camera] = []
     @Published var isScanning = false
     @Published var scanTimedOut = false
+    @Published var isDetectingType = false
 
     private var browser: NWBrowser?
     private var resolvedCameras: [String: Camera] = [:]
@@ -23,9 +24,12 @@ final class CameraDiscovery: NSObject, ObservableObject {
     // Haptic
     private let haptic = UIImpactFeedbackGenerator(style: .medium)
 
+    private static let manualCamerasKey = "manualCameras"
+
     override init() {
         super.init()
         haptic.prepare()
+        loadManualCameras()
         startMDNS()
         startBLE()
         startScanTimeout()
@@ -177,18 +181,74 @@ final class CameraDiscovery: NSObject, ObservableObject {
     func addManual(ip: String, port: Int = 80, cameraType: Camera.CameraType = .esp32) {
         let cam = Camera(id: ip, name: ip, host: ip, ip: ip, port: port, source: .manual, cameraType: cameraType)
         resolvedCameras[ip] = cam
+        saveManualCameras()
+        rebuildList()
+    }
+
+    /// Add a camera by IP, auto-detecting its type first.
+    func addManualWithDetection(ip: String, port: Int = 80) async {
+        isDetectingType = true
+        let detected = await detectCameraType(host: ip, port: port)
+        isDetectingType = false
+        addManual(ip: ip, port: port, cameraType: detected)
+    }
+
+    /// Probes a host to determine if it's an ESP32 or Pi camera.
+    func detectCameraType(host: String, port: Int) async -> Camera.CameraType {
+        let config = URLSessionConfiguration.ephemeral
+        config.timeoutIntervalForRequest = 3
+        config.timeoutIntervalForResource = 3
+        let probeSession = URLSession(configuration: config)
+        defer { probeSession.invalidateAndCancel() }
+
+        // Probe 1: GET /status — returns JSON with "type" field
+        if let statusURL = URL(string: "http://\(host):\(port)/status") {
+            do {
+                let (data, _) = try await probeSession.data(from: statusURL)
+                if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                   let type = json["type"] as? String {
+                    if type == "pi" { return .pi }
+                    if type == "esp32" { return .esp32 }
+                }
+            } catch {
+                // Continue to next probe
+            }
+        }
+
+        // Probe 2: GET http://{host}:8889/ — Pi with MediaMTX WebRTC
+        if let whepURL = URL(string: "http://\(host):8889/") {
+            do {
+                let (_, response) = try await probeSession.data(from: whepURL)
+                if let http = response as? HTTPURLResponse, http.statusCode < 500 {
+                    return .pi
+                }
+            } catch {
+                // Continue to fallback
+            }
+        }
+
+        return .esp32
+    }
+
+    func removeManualCamera(_ camera: Camera) {
+        guard camera.source == .manual else { return }
+        resolvedCameras.removeValue(forKey: camera.id)
+        saveManualCameras()
         rebuildList()
     }
 
     func refresh() {
         browser?.cancel()
-        resolvedCameras.removeAll()
+        // Preserve manual cameras across refresh
+        let manuals = resolvedCameras.filter { $0.value.source == .manual }
+        resolvedCameras = manuals
         bleCameras.removeAll()
         cameras.removeAll()
         haptic.prepare()
         startMDNS()
         startBLE()
         startScanTimeout()
+        rebuildList()
     }
 
     /// Async refresh for pull-to-refresh. Rescans and waits up to 3 seconds
@@ -201,6 +261,25 @@ final class CameraDiscovery: NSObject, ObservableObject {
             if !cameras.isEmpty { break }
         }
     }
+
+    // MARK: - Manual Camera Persistence
+
+    private func saveManualCameras() {
+        let manuals = resolvedCameras.values.filter { $0.source == .manual }
+        if let data = try? JSONEncoder().encode(Array(manuals)) {
+            UserDefaults.standard.set(data, forKey: Self.manualCamerasKey)
+        }
+    }
+
+    private func loadManualCameras() {
+        guard let data = UserDefaults.standard.data(forKey: Self.manualCamerasKey),
+              let saved = try? JSONDecoder().decode([Camera].self, from: data) else { return }
+        for camera in saved {
+            resolvedCameras[camera.id] = camera
+        }
+        rebuildList()
+    }
+
 }
 
 // MARK: - CBCentralManagerDelegate

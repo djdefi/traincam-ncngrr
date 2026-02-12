@@ -14,6 +14,8 @@
 		A10005 /* CameraDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10005 /* CameraDetailView.swift */; };
 		A10006 /* MJPEGStreamView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10006 /* MJPEGStreamView.swift */; };
 		A10007 /* TelemetryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10007 /* TelemetryView.swift */; };
+		A10010 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10011 /* SettingsView.swift */; };
+		A10011 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10012 /* OnboardingView.swift */; };
 		A10008 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = B10009 /* PrivacyInfo.xcprivacy */; };
 		A10009 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B10010 /* Assets.xcassets */; };
 		A20001 /* CameraModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20001 /* CameraModelTests.swift */; };
@@ -46,6 +48,8 @@
 		B10005 /* CameraDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraDetailView.swift; sourceTree = "<group>"; };
 		B10006 /* MJPEGStreamView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MJPEGStreamView.swift; sourceTree = "<group>"; };
 		B10007 /* TelemetryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TelemetryView.swift; sourceTree = "<group>"; };
+		B10011 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		B10012 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		B10008 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		B10009 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		B10010 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -102,6 +106,8 @@
 				B10005 /* CameraDetailView.swift */,
 				B10006 /* MJPEGStreamView.swift */,
 				B10007 /* TelemetryView.swift */,
+				B10011 /* SettingsView.swift */,
+				B10012 /* OnboardingView.swift */,
 				B10008 /* Info.plist */,
 				B10009 /* PrivacyInfo.xcprivacy */,
 				B10010 /* Assets.xcassets */,
@@ -273,6 +279,8 @@
 				A10005 /* CameraDetailView.swift in Sources */,
 				A10006 /* MJPEGStreamView.swift in Sources */,
 				A10007 /* TelemetryView.swift in Sources */,
+				A10010 /* SettingsView.swift in Sources */,
+				A10011 /* OnboardingView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -424,7 +432,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 6;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = TrainCam/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = RailCam;
@@ -453,7 +461,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 6;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = TrainCam/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = RailCam;
@@ -482,7 +490,7 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 6;
 				GENERATE_INFOPLIST_FILE = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = com.railcam.app.tests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -500,7 +508,7 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 6;
 				GENERATE_INFOPLIST_FILE = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = com.railcam.app.tests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -517,7 +525,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 6;
 				GENERATE_INFOPLIST_FILE = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = com.railcam.app.uitests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -534,7 +542,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 6;
 				GENERATE_INFOPLIST_FILE = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = com.railcam.app.uitests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
