@@ -60,22 +60,28 @@ async function connect(){
   if (pc) { log('Already connected'); return; }
   abortController = new AbortController();
   log('Creating PeerConnection...');
-  pc = new RTCPeerConnection({ iceServers: [] });
-  pc.addEventListener('track', ev => { if (ev.track.kind==='video') videoEl.srcObject = ev.streams[0]; });
-  pc.addEventListener('connectionstatechange', () => {
-    log('State: ' + pc.connectionState);
-    if (['disconnected','failed','closed'].includes(pc.connectionState)) { cleanup(); if (autorec.checked) scheduleReconnect(); }
+  // ponytail: `conn` is the local handle; every callback ignores itself once
+  // `pc` no longer points at it, so a late event from a dead connection can't
+  // tear down the live one.
+  const conn = pc = new RTCPeerConnection({ iceServers: [] });
+  const fail = msg => { if (pc !== conn) return; log(msg); cleanup(); if (autorec.checked) scheduleReconnect(); };
+  conn.addEventListener('track', ev => { if (pc === conn && ev.track.kind==='video') videoEl.srcObject = ev.streams[0]; });
+  conn.addEventListener('connectionstatechange', () => {
+    if (pc !== conn) return;
+    if (['disconnected','failed','closed'].includes(conn.connectionState)) fail('State: ' + conn.connectionState);
+    else log('State: ' + conn.connectionState);
   });
-  pc.addTransceiver('video',{direction:'recvonly'});
-  const offer = await pc.createOffer();
-  await pc.setLocalDescription(offer);
-  const base = MTX_BASE.replace(/\/$/,'');
-  let resp;
-  try { resp = await fetch(`${base}/${PATH}/whep`,{method:'POST',body:offer.sdp,headers:{'Content-Type':'application/sdp','Accept':'application/sdp'},cache:'no-store',signal:abortController.signal}); }
-  catch(e){ log('Fetch error: '+e); cleanup(); if (autorec.checked) scheduleReconnect(); return; }
-  if (!resp.ok) { log(`WHEP rejected: ${resp.status}`); cleanup(); if (autorec.checked) scheduleReconnect(); return; }
-  const answerSdp = await resp.text();
-  await pc.setRemoteDescription({type:'answer', sdp:answerSdp});
+  conn.addTransceiver('video',{direction:'recvonly'});
+  try {
+    const offer = await conn.createOffer();
+    await conn.setLocalDescription(offer);
+    const base = MTX_BASE.replace(/\/$/,'');
+    const resp = await fetch(`${base}/${PATH}/whep`,{method:'POST',body:offer.sdp,headers:{'Content-Type':'application/sdp','Accept':'application/sdp'},cache:'no-store',signal:abortController.signal});
+    if (!resp.ok) throw new Error(`WHEP rejected: ${resp.status}`);
+    const answerSdp = await resp.text();
+    await conn.setRemoteDescription({type:'answer', sdp:answerSdp});
+  } catch(e){ fail('Connect error: ' + e); return; }
+  if (pc !== conn) return;
   log('Connected');
   connectBtn.disabled = true; disconnectBtn.disabled = false; showUI();
 }
