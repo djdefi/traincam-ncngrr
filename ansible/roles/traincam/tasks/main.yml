@@ -221,20 +221,10 @@
     state: started
     daemon_reload: true
 
-# NetworkManager configuration for reliable WiFi roaming
-- name: Deploy NetworkManager WiFi roaming config
-  ansible.builtin.copy:
-    dest: /etc/NetworkManager/conf.d/10-wifi-roaming.conf
-    owner: root
-    group: root
-    mode: '0644'
-    content: |
-      [connection]
-      wifi.scan-rand-mac-address=no
-
-      [device]
-      wifi.scan-interval=30
-  notify: Restart NetworkManager
+- name: Remove obsolete NetworkManager override
+  ansible.builtin.file:
+    path: /etc/NetworkManager/conf.d/10-wifi-roaming.conf
+    state: absent
 
 # Configure WiFi network priorities (traincameranet as primary)
 - name: Set traincameranet WiFi priority
@@ -242,3 +232,51 @@
     cmd: nmcli connection modify preconfigured connection.autoconnect-priority 5
   changed_when: false
   failed_when: false
+
+- name: Boot without the unused desktop
+  ansible.builtin.file:
+    src: /lib/systemd/system/multi-user.target
+    dest: /etc/systemd/system/default.target
+    state: link
+    force: true
+
+- name: Disable console auto-login
+  ansible.builtin.file:
+    path: /etc/systemd/system/getty@tty1.service.d/autologin.conf
+    state: absent
+
+- name: Read installed services
+  ansible.builtin.service_facts:
+
+- name: Disable unused headless services
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    enabled: false
+    state: stopped
+  loop:
+    - bluetooth.service
+    - cups-browsed.service
+    - cups.service
+    - hciuart.service
+    - lightdm.service
+    - ModemManager.service
+    - wayvnc-control.service
+    - wayvnc.service
+  when: item in ansible_facts.services
+
+- name: Disable unused headless hardware
+  ansible.builtin.lineinfile:
+    path: /boot/firmware/config.txt
+    regexp: "{{ item.regexp }}"
+    line: "{{ item.line }}"
+  loop:
+    - regexp: '^dtparam=audio='
+      line: 'dtparam=audio=off'
+    - regexp: '^dtparam=hdmi='
+      line: 'dtparam=hdmi=off'
+    - regexp: '^enable_tvout='
+      line: 'enable_tvout=0'
+    - regexp: '^dtoverlay=disable-bt$'
+      line: 'dtoverlay=disable-bt'
+  loop_control:
+    label: "{{ item.line }}"

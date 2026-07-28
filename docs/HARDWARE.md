@@ -96,6 +96,7 @@ The onboard camera runs on power harvested from the DCC track. This document des
 - Camera Module v2 or v3 (CSI connector)
 - Power: 5V via micro USB from battery bank
 - Runs `rpicam-vid` for H.264 streaming
+- Provisioned headless: no desktop, VNC, HDMI, audio, or Bluetooth
 
 **Option B: ESP32-S3 + OV2640**
 - Seeed Studio XIAO ESP32S3 Sense
@@ -134,6 +135,11 @@ The onboard camera runs on power harvested from the DCC track. This document des
 3. Run the complete camera for 30 minutes and confirm `vcgencmd get_throttled` reports `0x0`.
 4. Insulate every exposed conductor, add strain relief, and keep the converter and camera ventilated.
 5. Repeat the test from wheel pickups on the layout before securing the car body.
+6. Measure 5V input current while a viewer is connected; size the converter and battery from the measured load, not a module's advertised maximum.
+
+The Pi role disables hardware and services that the headless camera does not
+use. A reboot is required after the first deployment. It deliberately leaves
+WiFi, CPU clocks, resolution, frame rate, and keyframe timing unchanged.
 
 ## Troubleshooting
 

@@ -167,6 +167,25 @@ PY
 test_case "Viewer status schema is complete" "ok" "$STATUS_SCHEMA"
 
 echo ""
+echo "--- Headless Power Configuration ---"
+
+TRAINCAM_TASKS="ansible/roles/traincam/tasks/main.yml"
+if grep -q '/lib/systemd/system/multi-user.target' "$TRAINCAM_TASKS"; then
+  test_case "Camera Pi boots headless" "found" "found"
+else
+  test_case "Camera Pi boots headless" "found" "missing"
+fi
+
+HEADLESS_SETTINGS=$(grep -Ec "line: '(dtparam=audio=off|dtparam=hdmi=off|enable_tvout=0|dtoverlay=disable-bt)'" "$TRAINCAM_TASKS")
+test_case "Unused headless hardware is disabled" "4" "$HEADLESS_SETTINGS"
+
+if grep -A4 'Remove obsolete NetworkManager override' "$TRAINCAM_TASKS" | grep -q 'state: absent'; then
+  test_case "Invalid NetworkManager override is removed" "found" "found"
+else
+  test_case "Invalid NetworkManager override is removed" "found" "missing"
+fi
+
+echo ""
 echo "==> Results: $PASS passed, $FAIL failed, $SKIP skipped"
 
 if [[ $FAIL -gt 0 ]]; then
