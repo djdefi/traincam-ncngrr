@@ -98,6 +98,26 @@
     mode: '0644'
   notify: Restart traincam
 
+- name: Deploy tuning file patcher
+  ansible.builtin.copy:
+    src: patch_tuning.py
+    dest: "{{ traincam_bin_dir }}/patch_tuning.py"
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Generate camera tuning file
+  ansible.builtin.command:
+    argv:
+      - "{{ traincam_bin_dir }}/patch_tuning.py"
+      - "{{ traincam_tuning_source }}"
+      - "{{ traincam_tuning_file }}"
+      - "{{ traincam_agc_shutter | to_json }}"
+      - "{{ traincam_agc_gain | to_json }}"
+  register: traincam_tuning_result
+  changed_when: "'changed' in traincam_tuning_result.stdout"
+  notify: Restart traincam
+
 - name: Deploy systemd unit
   ansible.builtin.template:
     src: traincam.service.j2

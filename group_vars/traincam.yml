@@ -9,10 +9,20 @@ traincam_width: 1280
 traincam_height: 720
 traincam_fps: 24
 traincam_awb: auto
-# libcamera tuning file. The NoIR camera modules have no IR-cut filter, so the
-# stock ov5647.json renders everything magenta (measured: U 143 / V 148 against
-# a neutral 128). Set to "" to use whatever libcamera picks for the sensor.
-traincam_tuning_file: /usr/share/libcamera/ipa/rpi/vc4/ov5647_noir.json
+# libcamera tuning. The NoIR camera modules have no IR-cut filter, so the stock
+# ov5647.json renders everything magenta (measured: U 143 / V 148 against a
+# neutral 128).
+traincam_tuning_source: /usr/share/libcamera/ipa/rpi/vc4/ov5647_noir.json
+traincam_tuning_file: /etc/traincam/tuning.json
+# AGC shutter/gain ladder, walked in order as the scene darkens. The stock
+# ladder reaches 30000us before it raises gain past 4, which parks a moving
+# camera at 1/33s and smears everything. This one spends gain first: measured
+# 15821us at gain 6.0 where stock gave 29986us at gain 3.06, same brightness.
+# The last point reaches the 24fps frame-duration ceiling, so dark tunnels are
+# no worse than stock. Raise the shutter values if the layout is too dark;
+# lower them if motion still smears and you can accept the noise.
+traincam_agc_shutter: [100, 2500, 5000, 10000, 20000, 41000]
+traincam_agc_gain: [1.0, 2.0, 4.0, 6.0, 8.0, 8.0]
 traincam_extra_opts: "--denoise cdn_off --saturation 1.1"
 
 # Optional tuning (uncomment to override):
