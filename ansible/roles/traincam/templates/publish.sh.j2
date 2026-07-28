@@ -13,6 +13,7 @@ fi
 : "${HEIGHT:={{ traincam_height }}}"
 : "${FPS:={{ traincam_fps }}}"
 : "${AWB:={{ traincam_awb }}}"
+: "${TUNING_FILE:={{ traincam_tuning_file | default('') }}}"
 : "${EXTRA_OPTS:={{ traincam_extra_opts }}}"
 : "${LATENCY_MODE:=}" # expected: low|ultra|ultra_plus
 : "${KEYFRAME_INTERVAL:=$((FPS*2))}"
@@ -51,6 +52,18 @@ log "LATENCY_MODE=${LATENCY_MODE:-unset} KEYFRAME_INTERVAL=${KEYFRAME_INTERVAL} 
 EXTRA_ARRAY=()
 if [[ -n "$EXTRA_OPTS" ]]; then
   IFS=' ' read -r -a EXTRA_ARRAY <<< "$EXTRA_OPTS"
+fi
+
+# A NoIR module running the IR-filtered tuning renders the whole scene magenta.
+# ponytail: a missing tuning file warns and falls back to the libcamera default
+# rather than taking the camera down over a colour problem.
+if [[ -n "$TUNING_FILE" ]]; then
+  if [[ -f "$TUNING_FILE" ]]; then
+    export LIBCAMERA_RPI_TUNING_FILE="$TUNING_FILE"
+    log "tuning file: $TUNING_FILE"
+  else
+    log "WARNING: TUNING_FILE=$TUNING_FILE not found, using libcamera default"
+  fi
 fi
 
 CAMERA_ARGS=(

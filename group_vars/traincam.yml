@@ -9,6 +9,10 @@ traincam_width: 1280
 traincam_height: 720
 traincam_fps: 24
 traincam_awb: auto
+# libcamera tuning file. The NoIR camera modules have no IR-cut filter, so the
+# stock ov5647.json renders everything magenta (measured: U 143 / V 148 against
+# a neutral 128). Set to "" to use whatever libcamera picks for the sensor.
+traincam_tuning_file: /usr/share/libcamera/ipa/rpi/vc4/ov5647_noir.json
 traincam_extra_opts: "--denoise cdn_off --saturation 1.1"
 
 # Optional tuning (uncomment to override):

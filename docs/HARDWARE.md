@@ -150,3 +150,4 @@ WiFi, CPU clocks, resolution, frame rate, and keyframe timing unchanged.
 | Pi won't boot | Buck converter voltage wrong | Verify 5V output with multimeter |
 | Overheating | Buck converter undersized | Use higher efficiency/capacity buck |
 | Weak WiFi | Camera position | Ensure antenna not blocked by metal |
+| Purple/magenta image | NoIR module using the IR-filtered tuning | Set `traincam_tuning_file` to `ov5647_noir.json` (see `group_vars/traincam.yml`) |

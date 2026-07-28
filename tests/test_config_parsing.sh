@@ -78,6 +78,32 @@ test_case "Partial config HEIGHT"       "1080"       "$HEIGHT"
 test_case "Partial config FPS default"  "24"         "$FPS"
 test_case "Partial config LATENCY_MODE" "ultra_plus" "$LATENCY_MODE"
 
+# Test 4: tuning file selection — evaluates the real block from publish.sh.j2
+# so the test breaks if the fallback is ever dropped.
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+TUNING_BLOCK=$(sed -n '/^if \[\[ -n "\$TUNING_FILE" \]\]/,/^fi$/p' \
+  "$REPO_ROOT/ansible/roles/traincam/templates/publish.sh.j2")
+log() { :; }
+
+if [[ -z "$TUNING_BLOCK" ]]; then
+  echo "✗ could not extract TUNING_FILE block from publish.sh.j2"
+  FAIL=$((FAIL + 1))
+else
+  touch "$TEMP_DIR/tuning.json"
+
+  TUNING_FILE="$TEMP_DIR/tuning.json"; unset LIBCAMERA_RPI_TUNING_FILE
+  eval "$TUNING_BLOCK"
+  test_case "Existing tuning file is exported" "$TEMP_DIR/tuning.json" "${LIBCAMERA_RPI_TUNING_FILE:-}"
+
+  TUNING_FILE="$TEMP_DIR/absent.json"; unset LIBCAMERA_RPI_TUNING_FILE
+  eval "$TUNING_BLOCK"
+  test_case "Missing tuning file falls back to libcamera" "" "${LIBCAMERA_RPI_TUNING_FILE:-}"
+
+  TUNING_FILE=""; unset LIBCAMERA_RPI_TUNING_FILE
+  eval "$TUNING_BLOCK"
+  test_case "Empty tuning file uses libcamera default" "" "${LIBCAMERA_RPI_TUNING_FILE:-}"
+fi
+
 echo ""
 echo "==> Results: $PASS passed, $FAIL failed"
 

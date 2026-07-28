@@ -4,6 +4,7 @@ HEIGHT={{ traincam_height }}
 FPS={{ traincam_fps }}
 PORT={{ traincam_port }}
 AWB="{{ traincam_awb }}"
+TUNING_FILE="{{ traincam_tuning_file | default('') }}"
 EXTRA_OPTS="{{ traincam_extra_opts }}"
 LOG_DIR={{ traincam_log_dir }}
 {% if traincam_keyframe_interval is defined %}FORCE_KEYFRAME_INTERVAL={{ traincam_keyframe_interval }}
