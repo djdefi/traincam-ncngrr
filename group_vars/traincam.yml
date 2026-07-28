@@ -23,7 +23,13 @@ traincam_tuning_file: /etc/traincam/tuning.json
 # lower them if motion still smears and you can accept the noise.
 traincam_agc_shutter: [100, 2500, 5000, 10000, 20000, 41000]
 traincam_agc_gain: [1.0, 2.0, 4.0, 6.0, 8.0, 8.0]
-traincam_extra_opts: "--denoise cdn_off --saturation 1.1"
+# --bitrate caps the encoder, which rpicam-vid otherwise leaves at 0bps
+# (= its own choice, measured 5-7 Mbit/s). Sustained high-bitrate TX is the
+# documented trigger for the brcmfmac SDIO wedge that takes the WiFi down for
+# good (see docs/NETWORK.md), and the Zero 2 W is 2.4GHz-only, so a busy hall
+# leaves no room to escape. Raise it if the picture is too soft and the radio
+# proves stable; the trade is reliability, not just airtime.
+traincam_extra_opts: "--denoise cdn_off --saturation 1.1 --bitrate 2500000"
 
 # Optional tuning (uncomment to override):
 # traincam_keyframe_interval: 48      # Defaults based on LATENCY_MODE
@@ -66,3 +72,16 @@ mediamtx_checksum: "sha256:c9ad9ae5f93c1a84a3a52055f630687498b98566e735b5177ed60
 traincam_watchdog_sec: 14
 # Persistent journal, bounded so an all-day run can't fill the card.
 traincam_journal_max_use: 64M
+
+# Network watchdog. The hardware watchdog above only catches a dead kernel.
+# When the BCM43430's SDIO bus wedges the kernel stays perfectly healthy and
+# keeps petting /dev/watchdog0 while the camera is unreachable for good, so it
+# needs its own detector. threshold x interval = how long the network must be
+# gone before rebooting; keep it minutes, not seconds, so a brief AP blip at
+# the show can't reboot every camera in the hall.
+traincam_netwatch_interval_sec: 30
+traincam_netwatch_threshold: 10
+# SDIO clock for the WiFi chip, in MHz. Default is 50 (measured). Halving it
+# widens setup/hold margins, which is the cheapest defence against the -110
+# bus timeouts, and costs nothing at our bitrate.
+traincam_sdio_overclock: 25

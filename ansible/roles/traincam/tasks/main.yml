@@ -300,6 +300,8 @@
       line: 'dtoverlay=disable-bt'
     - regexp: '^dtparam=watchdog='
       line: 'dtparam=watchdog=on'
+    - regexp: '^dtparam=sdio_overclock='
+      line: 'dtparam=sdio_overclock={{ traincam_sdio_overclock }}'
   loop_control:
     label: "{{ item.line }}"
 
@@ -357,3 +359,83 @@
     group: root
     mode: '0644'
   notify: Restart journald
+
+# WiFi power save cycles the chip's KSO (Keep SDIO On) register. Waking it can
+# fail under load and heat, and a failed wake reports the same -110 that killed
+# the link on 2026-07-28. Nothing here needs power save; the Pi is mains- or
+# cell-powered and streaming continuously anyway.
+- name: Stop NetworkManager putting the WiFi chip to sleep
+  ansible.builtin.copy:
+    content: |
+      # Managed by Ansible (traincam role)
+      [connection]
+      # 2 = disable. Default is 3 (enable) via NM's built-in default.
+      wifi.powersave = 2
+    dest: /etc/NetworkManager/conf.d/10-traincam-wifi.conf
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Restart NetworkManager
+
+# The hardware watchdog cannot see this failure: when the brcmfmac SDIO
+# backplane wedges, brcmf_sdio_dpc() halts but never marks the bus down, so the
+# kernel stays healthy, keeps petting /dev/watchdog0, and reports wlan0 as
+# operstate=up carrier=1 while nothing can traverse it. Reaching the gateway is
+# the only honest test.
+- name: Create the netwatch state directory
+  ansible.builtin.file:
+    path: /var/lib/traincam
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Deploy the network watchdog
+  ansible.builtin.template:
+    src: netwatch.sh.j2
+    dest: /usr/local/bin/traincam-netwatch
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Deploy the network watchdog unit
+  ansible.builtin.copy:
+    content: |
+      # Managed by Ansible (traincam role)
+      [Unit]
+      Description=TrainCam network watchdog
+      # Pointless while the network is being brought up.
+      After=network-online.target
+      [Service]
+      Type=oneshot
+      ExecStart=/usr/local/bin/traincam-netwatch
+    dest: /etc/systemd/system/traincam-netwatch.service
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Deploy the network watchdog timer
+  ansible.builtin.copy:
+    content: |
+      # Managed by Ansible (traincam role)
+      [Unit]
+      Description=Run the TrainCam network watchdog every {{ traincam_netwatch_interval_sec }}s
+      [Timer]
+      # Late enough that a slow boot-time association is not mistaken for a
+      # dead radio.
+      OnBootSec=5min
+      OnUnitActiveSec={{ traincam_netwatch_interval_sec }}s
+      AccuracySec=5s
+      [Install]
+      WantedBy=timers.target
+    dest: /etc/systemd/system/traincam-netwatch.timer
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Enable the network watchdog timer
+  ansible.builtin.systemd:
+    name: traincam-netwatch.timer
+    enabled: true
+    state: started
+    daemon_reload: true

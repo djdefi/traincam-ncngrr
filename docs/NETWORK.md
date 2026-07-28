@@ -132,3 +132,73 @@ If MediaMTX fails to start:
 sudo lsof -i :8554
 sudo lsof -i :8889
 ```
+
+## The WiFi chip wedges and never comes back
+
+The most likely unattended failure on a Pi Zero 2 W. Seen 2026-07-28.
+
+**Symptom:** the camera vanishes from the network and stays gone. It looks
+exactly like a dead battery — but the Pi is running perfectly the whole time.
+
+**How to tell it apart:**
+
+| Back on its own in ~30s | Kernel hung; the hardware watchdog fixed it. See `journalctl -b -1`. |
+| Gone, but the green ACT LED still flickers | This failure. WiFi is dead, the Pi is fine. |
+| Gone and completely dark | Actually a power problem. |
+
+**Confirm it after the fact** (the journal is persistent, so it survives):
+
+```bash
+journalctl -b -1 -k | grep -E "failed backplane access|status -110"
+```
+
+**What happens.** The SDIO bus between the SoC and the BCM43430 WiFi chip
+times out under sustained TX. `brcmf_sdio_dpc()` halts, but it only marks the
+bus down on `-ENOMEDIUM`, and this is `-ETIMEDOUT` — so the bus is never
+marked down. Consequences worth knowing:
+
+- `wlan0` keeps reporting `operstate=up` and `carrier=1`. **Link state lies.**
+  Never write a health check against it; ping the gateway instead.
+- The kernel stays healthy, so systemd keeps petting `/dev/watchdog0`. The
+  hardware watchdog **cannot** catch this.
+- NetworkManager keeps polling the dead chip every ~6s forever, which is the
+  repeating `-110` in the log.
+
+**What we do about it.** In order of how much they help:
+
+1. `--bitrate 2500000` — sustained high-bitrate TX is the trigger. Capping it
+   is the only change that attacks the cause rather than the symptom.
+2. `traincam-netwatch.timer` — pings the gateway every 30s and reboots after
+   5 minutes of failure. See below.
+3. `dtparam=sdio_overclock=25` — halves the SDIO clock from 50MHz for wider
+   timing margins (verify with `sudo cat /sys/kernel/debug/mmc1/ios`).
+4. WiFi power save off — a failed KSO wake reports the same `-110`. The ESP32
+   notes above already said this; it applies to the Pi too.
+5. A heatsink. 78 C with no heatsink is a real aggravator.
+
+None of these are a fix. The firmware bug is Broadcom's and there is no known
+patch; `firmware-brcm80211` is already on RPi's `rpt3` stability release.
+
+### Is a reboot even enough?
+
+**Unknown, and worth checking.** The WiFi chip shares a power domain with the
+SoC, so a warm reboot may leave a wedged chip wedged. The watchdog is built to
+answer this in the field: it reboots once, and if the network is still gone
+afterwards it does **not** try again. Instead it logs
+
+```
+STILL unreachable after a reboot: a warm reboot does NOT clear this.
+```
+
+So after any incident, check:
+
+```bash
+journalctl -u traincam-netwatch --no-pager | tail -20
+```
+
+- Rebooted, then silence -> a warm reboot fixes it. We are done.
+- The `STILL unreachable` line -> it does not. We need a USB WiFi dongle
+  (bypasses the SDIO bus entirely) or an external circuit that cuts the 5V.
+
+It deliberately never reboots twice in a row, so it cannot boot-loop in front
+of visitors.

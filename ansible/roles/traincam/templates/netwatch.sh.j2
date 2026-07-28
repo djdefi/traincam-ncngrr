@@ -1,0 +1,70 @@
+#!/bin/bash
+# Managed by Ansible (traincam role)
+#
+# Recover from the brcmfmac SDIO wedge that the hardware watchdog cannot see.
+#
+# When the BCM43430's SDIO backplane fails, brcmf_sdio_dpc() halts but leaves
+# bus->sdiodev->state at BRCMF_SDIOD_DATA (only -ENOMEDIUM moves it, never the
+# -ETIMEDOUT we get). The bus is therefore never marked down: wlan0 keeps
+# reporting operstate=up and carrier=1 while nothing can traverse it, and the
+# kernel stays healthy so systemd keeps petting /dev/watchdog0 forever.
+#
+# ponytail: reaching the gateway is the only honest test. Link state lies here.
+set -euo pipefail
+
+STATE_DIR="${TRAINCAM_NETWATCH_STATE:-/var/lib/traincam}"
+FAIL_FILE="$STATE_DIR/netwatch.fails"
+STAMP_FILE="$STATE_DIR/netwatch.rebooted"
+THRESHOLD="${TRAINCAM_NETWATCH_THRESHOLD:-{{ traincam_netwatch_threshold }}}"
+INTERVAL="${TRAINCAM_NETWATCH_INTERVAL:-{{ traincam_netwatch_interval_sec }}}"
+REBOOT_CMD="${TRAINCAM_NETWATCH_REBOOT_CMD:-systemctl reboot}"
+LOG_CMD="${TRAINCAM_NETWATCH_LOG_CMD:-logger -t traincam-netwatch}"
+
+log() { $LOG_CMD "$*"; }
+
+mkdir -p "$STATE_DIR"
+
+# Injectable so the logic can be tested without a network or a real reboot.
+probe() {
+    if [ -n "${TRAINCAM_NETWATCH_PROBE_CMD:-}" ]; then
+        $TRAINCAM_NETWATCH_PROBE_CMD
+        return $?
+    fi
+    local gw
+    gw=$(ip route show default 2>/dev/null | awk '{print $3; exit}')
+    # No default route is itself a loss of network, not an excuse to skip.
+    [ -n "$gw" ] || return 1
+    ping -q -c 3 -W 2 "$gw" >/dev/null 2>&1
+}
+
+if probe; then
+    # Clearing the stamp here is what makes this safe: a stamp that survives
+    # means we rebooted and have not had the network back since.
+    rm -f "$FAIL_FILE" "$STAMP_FILE"
+    exit 0
+fi
+
+fails=$(cat "$FAIL_FILE" 2>/dev/null || echo 0)
+case "$fails" in ''|*[!0-9]*) fails=0 ;; esac
+fails=$((fails + 1))
+echo "$fails" >"$FAIL_FILE"
+
+if [ "$fails" -lt "$THRESHOLD" ]; then
+    log "network unreachable ($fails/$THRESHOLD)"
+    exit 0
+fi
+
+if [ -e "$STAMP_FILE" ]; then
+    # We already tried. The BCM43430 shares a power domain with the SoC, so a
+    # warm reboot may not clear a wedged chip; this is the evidence that it
+    # does not. Stop here rather than boot-loop at the show.
+    log "STILL unreachable after a reboot: a warm reboot does NOT clear this. Needs a cold power cycle (see docs/NETWORK.md)."
+    rm -f "$FAIL_FILE"
+    exit 0
+fi
+
+log "network unreachable for $((fails * INTERVAL))s, rebooting to recover"
+: >"$STAMP_FILE"
+rm -f "$FAIL_FILE"
+sync
+$REBOOT_CMD
