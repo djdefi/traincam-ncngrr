@@ -56,6 +56,22 @@ function scheduleUIHide(){ clearTimeout(uiHideTimer); uiHideTimer = setTimeout((
 function showUI(){ document.body.classList.remove('ui-hidden'); scheduleUIHide(); }
 ['mousemove','keydown','touchstart'].forEach(ev=>window.addEventListener(ev, showUI,{passive:true}));
 
+// WHEP hands back the session URL in the Location header, and the server only
+// frees the session when we DELETE it. Without this a tab close, a refresh or
+// any reconnect strands a session server-side: MediaMTX keeps writing to a
+// reader that stopped reading and burns the wifi TX path on it. Observed 3
+// stale sessions at once, one of which ran 28 minutes.
+let resource = null;
+
+// ponytail: deliberately NOT on abortController - cleanup() aborts that, which
+// would cancel the very request that frees the session. keepalive lets it
+// outlive the page on a tab close.
+function releaseResource(){
+  if (!resource) return;
+  const url = resource; resource = null;
+  try { fetch(url, {method:'DELETE', keepalive:true, cache:'no-store'}).catch(()=>{}); } catch(_){}
+}
+
 async function connect(){
   if (pc) { log('Already connected'); return; }
   abortController = new AbortController();
@@ -78,6 +94,10 @@ async function connect(){
     const base = MTX_BASE.replace(/\/$/,'');
     const resp = await fetch(`${base}/${PATH}/whep`,{method:'POST',body:offer.sdp,headers:{'Content-Type':'application/sdp','Accept':'application/sdp'},cache:'no-store',signal:abortController.signal});
     if (!resp.ok) throw new Error(`WHEP rejected: ${resp.status}`);
+    // Location is relative ("/traincam/whep/<uuid>"), so resolve it against
+    // the WHEP origin rather than this page's.
+    const loc = resp.headers.get('Location');
+    if (loc) { try { resource = new URL(loc, base).href; } catch(_){ resource = null; } }
     const answerSdp = await resp.text();
     await conn.setRemoteDescription({type:'answer', sdp:answerSdp});
   } catch(e){ fail('Connect error: ' + e); return; }
@@ -86,13 +106,20 @@ async function connect(){
   connectBtn.disabled = true; disconnectBtn.disabled = false; showUI();
 }
 
-function cleanup(){ if (abortController) abortController.abort(); if (pc){ try{ pc.close(); }catch(_){} } pc=null; connectBtn.disabled=false; disconnectBtn.disabled=true; showUI(); }
+function cleanup(){ releaseResource(); if (abortController) abortController.abort(); if (pc){ try{ pc.close(); }catch(_){} } pc=null; connectBtn.disabled=false; disconnectBtn.disabled=true; showUI(); }
 function scheduleReconnect(){ if (reconnectTimer) return; reconnectTimer=setTimeout(()=>{ reconnectTimer=null; connect(); }, AUTOREC_DELAY_MS); log('Reconnecting in '+AUTOREC_DELAY_MS+'ms...'); }
 connectBtn.onclick = () => { if (reconnectTimer){ clearTimeout(reconnectTimer); reconnectTimer=null;} connect(); showUI(); };
 disconnectBtn.onclick = () => { if (reconnectTimer){ clearTimeout(reconnectTimer); reconnectTimer=null;} autorec.checked=false; cleanup(); log('Disconnected'); };
 fsBtn.onclick = () => { attemptFullscreen(false); showUI(); };
 fitBtn.onclick = () => { if (videoEl.style.objectFit==='contain'){ videoEl.style.objectFit='cover'; fitBtn.textContent='Fit'; } else { videoEl.style.objectFit='contain'; fitBtn.textContent='Fill'; } showUI(); };
 window.addEventListener('load', () => { connect(); setTimeout(()=>attemptFullscreen(true),600); scheduleUIHide(); });
+// Closing the tab or backgrounding the app on a phone otherwise leaves the
+// session open on the server forever - the exact thing a hall full of
+// wandering visitors will do all day.
+window.addEventListener('pagehide', () => { cleanup(); });
+// pagehide also fires when a phone puts the page in the back/forward cache, so
+// pick the stream back up if it is restored rather than showing a dead frame.
+window.addEventListener('pageshow', ev => { if (ev.persisted && !pc) connect(); });
 </script>
 </body>
 </html>

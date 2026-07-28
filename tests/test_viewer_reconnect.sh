@@ -34,6 +34,7 @@ const vm = require('vm');
 
 let reconnects = 0;
 const peers = [];
+const winHandlers = {};
 
 class FakePC {
   constructor() { this.handlers = {}; this.connectionState = 'new'; peers.push(this); }
@@ -57,9 +58,23 @@ globalThis.document = {
   getElementById: id => (els[id] ||= makeEl()),
   body: { classList: { add() {}, remove() {} } },
 };
-globalThis.window = { location: { href: 'http://traincam1.local:8080/viewer.html' }, addEventListener() {} };
+globalThis.window = {
+  location: { href: 'http://traincam1.local:8080/viewer.html' },
+  addEventListener(type, fn) { (winHandlers[type] ||= []).push(fn); },
+};
 globalThis.RTCPeerConnection = FakePC;
-globalThis.fetch = () => Promise.resolve({ ok: true, status: 200, text: () => Promise.resolve('v=0') });
+// Records every request so the tests can assert the WHEP session is released.
+const fetches = [];
+globalThis.fetch = (url, opts) => {
+  fetches.push({ url, opts: opts || {} });
+  return Promise.resolve({
+    ok: true, status: 201,
+    // MediaMTX returns a RELATIVE Location; the viewer must resolve it
+    // against the WHEP origin, not the page origin (different port).
+    headers: { get: k => (k.toLowerCase() === 'location' ? '/traincam/whep/abc-123' : null) },
+    text: () => Promise.resolve('v=0'),
+  });
+};
 globalThis.console = { log() {} };
 let pendingReconnect = null;
 globalThis.setTimeout = (fn, ms) => { if (ms === 1500) { reconnects++; pendingReconnect = fn; } return { ms }; };
@@ -93,6 +108,43 @@ vm.runInThisContext(fs.readFileSync(process.argv[2], 'utf8'));
   peers[1].fire('connectionstatechange', 'failed');
   assert.strictEqual(reconnects, 2, 'live peer failure should schedule a reconnect');
   process.stdout.write('✓ reconnect loop keeps retrying\n');
+
+  // 4. Every WHEP session must be released with a DELETE. Without this the
+  //    server keeps writing to a reader that stopped reading; three stale
+  //    sessions were observed at once, one of them for 28 minutes.
+  const deletes = fetches.filter(f => (f.opts.method || 'GET').toUpperCase() === 'DELETE');
+  assert.ok(deletes.length >= 1, 'cleanup should DELETE the WHEP session');
+  assert.strictEqual(
+    deletes[0].url, 'http://traincam1.local:8889/traincam/whep/abc-123',
+    'relative Location must resolve against the WHEP origin (port 8889), not the page (8080)');
+  process.stdout.write('✓ WHEP session is released with a DELETE\n');
+
+  // 5. cleanup() aborts the AbortController, so a DELETE carrying that signal
+  //    would cancel itself and silently leak the session anyway.
+  assert.ok(deletes.every(d => !d.opts.signal),
+    'DELETE must not use the abort signal that cleanup() fires');
+  assert.ok(deletes.every(d => d.opts.keepalive === true),
+    'DELETE needs keepalive to survive the page being closed');
+  process.stdout.write('✓ DELETE survives cleanup and page unload\n');
+
+  // 6. Closing a tab or backgrounding the app on a phone must release too -
+  //    the exact thing visitors do all day at the show.
+  assert.ok(winHandlers.pagehide && winHandlers.pagehide.length,
+    'viewer must handle pagehide or a closed tab strands the session');
+  FakePC.failOffer = false;
+  await connect();
+  await flush();
+  const before = fetches.filter(f => (f.opts.method || '').toUpperCase() === 'DELETE').length;
+  winHandlers.pagehide.forEach(fn => fn());
+  const after = fetches.filter(f => (f.opts.method || '').toUpperCase() === 'DELETE').length;
+  assert.strictEqual(after, before + 1, 'pagehide should release exactly one session');
+  process.stdout.write('✓ closing the tab releases the session\n');
+
+  // 7. ...and releasing twice must not fire a second DELETE.
+  winHandlers.pagehide.forEach(fn => fn());
+  const again = fetches.filter(f => (f.opts.method || '').toUpperCase() === 'DELETE').length;
+  assert.strictEqual(again, after, 'a second cleanup should not re-DELETE');
+  process.stdout.write('✓ double cleanup does not double-DELETE\n');
 })().catch(err => { process.stdout.write('✗ ' + err.message + '\n'); process.exit(1); });
 HARNESS
 
