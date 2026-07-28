@@ -11,7 +11,7 @@ All TrainCam devices connect to a dedicated WiFi network:
 | SSID | _(your network name)_ |
 | Password | _(your password)_ |
 
-**Note:** The ESP32 firmware has placeholder credentials in `CameraWebServer/CameraWebServer.ino` — edit before uploading. The Pi uses standard wpa_supplicant configuration.
+**Note:** The ESP32 firmware has placeholder credentials in `CameraWebServer/CameraWebServer.ino` — edit before uploading. Configure the Pi network with Raspberry Pi Imager or NetworkManager.
 
 ## Required Ports
 
@@ -31,8 +31,8 @@ TrainCam uses mDNS (Avahi/Bonjour) for hostname resolution. This works on:
 
 | Hostname | Device | Purpose |
 |----------|--------|---------|
-| `traincam1.local` | Onboard camera (Pi Zero W) | **Primary URL — use this everywhere** |
-| `traincam.local` | ESP32 camera (planned) | ESP32 camera unit |
+| `traincam1.local` | Onboard camera (Pi Zero 2 W) | **Primary URL — use this everywhere** |
+| `traincam-xxxxxx.local` | ESP32 camera | Unique name derived from the module ID |
 
 **Viewer URL:**
 ```
@@ -45,19 +45,17 @@ Raspberry Pi OS has Avahi (mDNS) enabled by default. The Pi is addressable at `<
 
 ### ESP32 mDNS
 
-**Status:** Not yet implemented (see `issues/1.md`)
-
-When implemented, the ESP32 will advertise itself as `traincam.local` on the network.
+The ESP32 advertises `_traincam._tcp` and `_http._tcp` on port 80. Its unique hostname is printed over Serial after WiFi connects.
 
 ## Network Topology
 
 ```
 traincameranet (WiFi AP)
        │
-       ├─── traincam1.local (Pi Zero W - onboard camera)
+       ├─── traincam1.local (Pi Zero 2 W - onboard camera)
        │         │
        │         ├── RTSP: rtsp://traincam1.local:8554/traincam
-       │         ├── WHEP: http://traincam1.local:8889/whep/traincam
+       │         ├── WHEP: http://traincam1.local:8889/traincam/whep
        │         └── Viewer: http://traincam1.local:8080/viewer.html
        │
        └─── display.local (Pi 5 - receiver)

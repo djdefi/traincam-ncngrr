@@ -1,0 +1,11 @@
+<?xml version="1.0" standalone="no"?>
+<!DOCTYPE service-group SYSTEM "avahi-service.dtd">
+<service-group>
+  <name replace-wildcards="yes">%h</name>
+  <service>
+    <type>_traincam._tcp</type>
+    <port>{{ traincam_viewer_port | default(8080) }}</port>
+    <txt-record>type=pi</txt-record>
+    <txt-record>stream=webrtc</txt-record>
+  </service>
+</service-group>

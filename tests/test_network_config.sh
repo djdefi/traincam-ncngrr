@@ -37,6 +37,11 @@ if [[ -f "$MEDIAMTX_TEMPLATE" ]]; then
   else
     test_case "MediaMTX has 'traincam' path defined" "found" "missing"
   fi
+  if grep -q "webrtcAddress.*traincam_webrtc_port" "$MEDIAMTX_TEMPLATE"; then
+    test_case "MediaMTX WebRTC port is configured" "found" "found"
+  else
+    test_case "MediaMTX WebRTC port is configured" "found" "missing"
+  fi
 else
   skip_case "MediaMTX template exists" "file not found"
 fi
@@ -65,6 +70,12 @@ if [[ -f "$ESP32_INO" ]]; then
   else
     test_case "ESP32 WiFi sleep disabled" "found" "missing"
   fi
+
+  if grep -q 'MDNS.addService("traincam", "tcp", 80)' "$ESP32_INO"; then
+    test_case "ESP32 advertises TrainCam mDNS service" "found" "found"
+  else
+    test_case "ESP32 advertises TrainCam mDNS service" "found" "missing"
+  fi
 else
   skip_case "ESP32 WiFi config" "file not found"
 fi
@@ -80,6 +91,13 @@ if [[ -f "$INVENTORY" ]]; then
   else
     test_case "Inventory uses mDNS hostnames" "found" "missing"
   fi
+
+  AVAHI_TEMPLATE="ansible/roles/traincam/templates/traincam-avahi.service.j2"
+  if grep -q "_traincam._tcp" "$AVAHI_TEMPLATE"; then
+    test_case "Pi advertises TrainCam mDNS service" "found" "found"
+  else
+    test_case "Pi advertises TrainCam mDNS service" "found" "missing"
+  fi
 else
   skip_case "Inventory mDNS check" "file not found"
 fi
@@ -92,6 +110,11 @@ if [[ -f "$VIEWER" ]]; then
     test_case "Viewer supports WHEP base override" "found" "found"
   else
     test_case "Viewer supports WHEP base override" "found" "missing"
+  fi
+  if grep -Fq '/${PATH}/whep' "$VIEWER"; then
+    test_case "Viewer uses MediaMTX WHEP path" "found" "found"
+  else
+    test_case "Viewer uses MediaMTX WHEP path" "found" "missing"
   fi
 else
   skip_case "Viewer hostname check" "file not found"
@@ -114,9 +137,34 @@ if [[ -f "$SERVICE_TEMPLATE" ]]; then
   else
     test_case "traincam.service starts after mediamtx" "found" "missing"
   fi
+
+  if grep -q 'Requires=mediamtx.service' "$SERVICE_TEMPLATE"; then
+    test_case "traincam.service requires mediamtx" "found" "found"
+  else
+    test_case "traincam.service requires mediamtx" "found" "missing"
+  fi
 else
   skip_case "Service dependency check" "file not found"
 fi
+
+VIEWER_SERVER="ansible/roles/traincam/files/viewer_server.py"
+if python3 -m py_compile "$VIEWER_SERVER"; then
+  test_case "Viewer server compiles" "ok" "ok"
+else
+  test_case "Viewer server compiles" "ok" "failed"
+fi
+STATUS_SCHEMA=$(python3 - "$VIEWER_SERVER" <<'PY'
+import importlib.util
+import sys
+
+spec = importlib.util.spec_from_file_location("viewer_server", sys.argv[1])
+module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
+required = {"hostname", "uptime_s", "temperature_c", "ip", "type", "stream"}
+print("ok" if required <= module.get_status().keys() else "missing")
+PY
+)
+test_case "Viewer status schema is complete" "ok" "$STATUS_SCHEMA"
 
 echo ""
 echo "==> Results: $PASS passed, $FAIL failed, $SKIP skipped"

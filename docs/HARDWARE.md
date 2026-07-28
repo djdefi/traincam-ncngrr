@@ -91,8 +91,8 @@ The onboard camera runs on power harvested from the DCC track. This document des
 
 ### 6. Camera Unit
 
-**Option A: Raspberry Pi Zero W + Camera Module**
-- Pi Zero W (WiFi built-in)
+**Option A: Raspberry Pi Zero 2 W + Camera Module**
+- Pi Zero 2 W running 64-bit Raspberry Pi OS
 - Camera Module v2 or v3 (CSI connector)
 - Power: 5V via micro USB from battery bank
 - Runs `rpicam-vid` for H.264 streaming
@@ -126,6 +126,14 @@ The onboard camera runs on power harvested from the DCC track. This document des
 - Use hot glue or foam tape for component mounting
 - Route wires to avoid interference with trucks
 - Consider adding a power switch for easy on/off
+
+## Before Installing in a Car
+
+1. Set the buck converter to 5.1V before connecting a camera, then confirm it stays stable under camera load.
+2. Verify the battery bank supports simultaneous charge and output without resetting when track power is removed and restored.
+3. Run the complete camera for 30 minutes and confirm `vcgencmd get_throttled` reports `0x0`.
+4. Insulate every exposed conductor, add strain relief, and keep the converter and camera ventilated.
+5. Repeat the test from wheel pickups on the layout before securing the car body.
 
 ## Troubleshooting
 

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-TrainCam is a live camera streaming system for model railroads. A tiny camera mounted on a moving train streams video over local WiFi, powered from DCC track power. Two hardware platforms are supported: Raspberry Pi Zero W (primary) and ESP32-S3 XIAO Sense.
+TrainCam is a live camera streaming system for model railroads. A tiny camera mounted on a moving train streams video over local WiFi, powered from DCC track power. Two hardware platforms are supported: Raspberry Pi Zero 2 W (primary) and ESP32-S3 XIAO Sense.
 
 ## Commands
 

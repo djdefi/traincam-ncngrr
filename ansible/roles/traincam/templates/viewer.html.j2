@@ -36,7 +36,7 @@
 <script>
 const PATH = 'traincam';
 // Derive MediaMTX base (viewer served on 8080; mediamtx on 8889 by default)
-const MTX_BASE = (() => { try { const u = new URL(window.location.href); u.port='8889'; return u.origin; } catch(_) { return window.location.origin; } })();
+const MTX_BASE = (() => { try { const u = new URL(window.location.href); u.port='{{ traincam_webrtc_port | default(8889) }}'; return u.origin; } catch(_) { return window.location.origin; } })();
 const AUTOREC_DELAY_MS = 1500;
 let pc, abortController, reconnectTimer, uiHideTimer;
 const statusEl = document.getElementById('status');
@@ -70,19 +70,10 @@ async function connect(){
   const offer = await pc.createOffer();
   await pc.setLocalDescription(offer);
   const base = MTX_BASE.replace(/\/$/,'');
-  const primary = `${base}/whep/${PATH}`;
-  const legacy = `${base}/${PATH}/whep`;
-  let resp, attempt = 0;
-  for (const url of [primary, legacy]) {
-    attempt++; log(`WHEP attempt ${attempt}: POST ${url}`);
-    try { resp = await fetch(url,{method:'POST',body:offer.sdp,headers:{'Content-Type':'application/sdp','Accept':'application/sdp'},cache:'no-store',signal:abortController.signal}); }
-    catch(e){ log('Fetch error: '+e); resp=null; }
-    if (resp && resp.ok) { log(`WHEP attempt ${attempt} succeeded (${resp.status})`); break; }
-    if (resp && resp.status===404) { log('Primary pattern 404, trying fallback...'); continue; }
-    if (resp) { log(`WHEP rejected on attempt ${attempt}: ${resp.status}`); cleanup(); if (autorec.checked) scheduleReconnect(); return; }
-    cleanup(); if (autorec.checked) scheduleReconnect(); return;
-  }
-  if (!resp || !resp.ok) { log('WHEP 404 on all patterns'); cleanup(); if (autorec.checked) scheduleReconnect(); return; }
+  let resp;
+  try { resp = await fetch(`${base}/${PATH}/whep`,{method:'POST',body:offer.sdp,headers:{'Content-Type':'application/sdp','Accept':'application/sdp'},cache:'no-store',signal:abortController.signal}); }
+  catch(e){ log('Fetch error: '+e); cleanup(); if (autorec.checked) scheduleReconnect(); return; }
+  if (!resp.ok) { log(`WHEP rejected: ${resp.status}`); cleanup(); if (autorec.checked) scheduleReconnect(); return; }
   const answerSdp = await resp.text();
   await pc.setRemoteDescription({type:'answer', sdp:answerSdp});
   log('Connected');

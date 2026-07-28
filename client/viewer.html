@@ -81,7 +81,7 @@ async function connect() {
   if (!base) {
     base = `${window.location.protocol}//${window.location.hostname}:${whepPort}`;
   }
-  const endpoint = `${base.replace(/\/$/, '')}/whep/${PATH}`;
+  const endpoint = `${base.replace(/\/$/, '')}/${PATH}/whep`;
   log('POST offer to ' + endpoint + ' ...');
   let resp;
   try {

@@ -1,4 +1,5 @@
 #include "esp_camera.h"
+#include <ESPmDNS.h>
 #include <WiFi.h>
 
 #define CAMERA_MODEL_XIAO_ESP32S3 // Has PSRAM
@@ -36,8 +37,8 @@ void setup() {
   config.pin_pclk = PCLK_GPIO_NUM;
   config.pin_vsync = VSYNC_GPIO_NUM;
   config.pin_href = HREF_GPIO_NUM;
-  config.pin_sscb_sda = SIOD_GPIO_NUM;
-  config.pin_sscb_scl = SIOC_GPIO_NUM;
+  config.pin_sccb_sda = SIOD_GPIO_NUM;
+  config.pin_sccb_scl = SIOC_GPIO_NUM;
   config.pin_pwdn = PWDN_GPIO_NUM;
   config.pin_reset = RESET_GPIO_NUM;
   config.xclk_freq_hz = 20000000;
@@ -72,6 +73,8 @@ void setup() {
   esp_err_t err = esp_camera_init(&config);
   if (err != ESP_OK) {
     Serial.printf("Camera init failed with error 0x%x", err);
+    delay(5000);
+    ESP.restart();
     return;
   }
 
@@ -87,11 +90,6 @@ void setup() {
     s->set_framesize(s, FRAMESIZE_QVGA);
   }
 
-// Setup LED FLash if LED pin is defined in camera_pins.h
-#if defined(LED_GPIO_NUM)
-  setupLedFlash(LED_GPIO_NUM);
-#endif
-
   WiFi.begin(ssid, password);
   WiFi.setSleep(false);
 
@@ -102,11 +100,21 @@ void setup() {
   Serial.println("");
   Serial.println("WiFi connected");
 
+  char hostname[24];
+  snprintf(hostname, sizeof(hostname), "traincam-%06llx",
+           static_cast<unsigned long long>((ESP.getEfuseMac() >> 24) & 0xFFFFFF));
+  if (MDNS.begin(hostname)) {
+    MDNS.addService("http", "tcp", 80);
+    MDNS.addService("traincam", "tcp", 80);
+    MDNS.addServiceTxt("traincam", "tcp", "type", "esp32");
+    MDNS.addServiceTxt("traincam", "tcp", "stream", "mjpeg");
+  } else {
+    Serial.println("mDNS setup failed; IP access remains available");
+  }
+
   startCameraServer();
 
-  Serial.print("Camera Ready! Use 'http://");
-  Serial.print(WiFi.localIP());
-  Serial.println("' to connect");
+  Serial.printf("Camera ready: http://%s.local/stream\n", hostname);
 }
 
 void loop() {

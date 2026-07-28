@@ -6,6 +6,7 @@ rtspAddress: :{{ traincam_port | default(8554) }}
 
 # WebRTC configuration for local network streaming
 # No STUN servers - works offline on any local network (home WiFi, mobile hotspot, etc.)
+webrtcAddress: :{{ traincam_webrtc_port | default(8889) }}
 webrtcICEServers2: []
 
 # Explicit local addresses for WebRTC peer connections

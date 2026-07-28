@@ -17,7 +17,7 @@ Add this to your iPhone home screen for one-tap access.
 - **Name:** _(configure on your phone)_
 - **Password:** _(configure on your phone)_
 
-**Pi auto-connects to networks configured in wpa_supplicant.**
+**Pi auto-connects to networks configured in NetworkManager.**
 
 ---
 

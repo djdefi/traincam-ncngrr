@@ -8,6 +8,8 @@
   ansible.builtin.user:
     name: "{{ traincam_user }}"
     group: "{{ traincam_group }}"
+    groups: video
+    append: true
     create_home: yes
     state: present
 
@@ -44,9 +46,11 @@
     mode: '0644'
   notify: Reload udev rules
 
-- name: Ensure ffmpeg installed
+- name: Ensure runtime packages installed
   ansible.builtin.package:
-    name: ffmpeg
+    name:
+      - avahi-daemon
+      - ffmpeg
     state: present
   become: true
 
@@ -54,6 +58,7 @@
   ansible.builtin.get_url:
     url: "{{ mediamtx_download_url }}"
     dest: /tmp/mediamtx.tar.gz
+    checksum: "{{ mediamtx_checksum }}"
     mode: '0644'
   register: mediamtx_download
 
@@ -73,7 +78,7 @@
     owner: "{{ traincam_user }}"
     group: "{{ traincam_group }}"
     mode: '0755'
-  notify: Restart traincam service
+  notify: Restart traincam
 
 - name: Deploy RTSP publish script
   ansible.builtin.template:
@@ -82,7 +87,7 @@
     owner: "{{ traincam_user }}"
     group: "{{ traincam_group }}"
     mode: '0755'
-  notify: Restart traincam service
+  notify: Restart traincam
 
 - name: Deploy stream configuration
   ansible.builtin.template:
@@ -91,7 +96,7 @@
     owner: root
     group: root
     mode: '0644'
-  notify: Restart traincam service
+  notify: Restart traincam
 
 - name: Deploy systemd unit
   ansible.builtin.template:
@@ -100,7 +105,7 @@
     owner: root
     group: root
     mode: '0644'
-  notify: Reload systemd and restart traincam
+  notify: Restart traincam
 
 - name: Create mediamtx config directory
   ansible.builtin.file:
@@ -126,19 +131,21 @@
     owner: root
     group: root
     mode: '0644'
-  notify: Reload systemd and restart mediamtx
+  notify: Restart mediamtx
 
 - name: Ensure mediamtx service enabled and started
   ansible.builtin.systemd:
     name: mediamtx.service
     enabled: true
     state: started
+    daemon_reload: true
 
 - name: Ensure traincam service enabled and started
   ansible.builtin.systemd:
     name: "{{ traincam_service_name }}.service"
     enabled: true
     state: started
+    daemon_reload: true
 
 - name: Create viewer web directory
   ansible.builtin.file:
@@ -156,6 +163,30 @@
     group: "{{ traincam_group }}"
     mode: '0644'
 
+- name: Deploy viewer server
+  ansible.builtin.copy:
+    src: viewer_server.py
+    dest: "{{ traincam_bin_dir }}/viewer_server.py"
+    owner: "{{ traincam_user }}"
+    group: "{{ traincam_group }}"
+    mode: '0755'
+  notify: Restart viewer
+
+- name: Remove untracked discovery server
+  ansible.builtin.file:
+    path: "{{ traincam_bin_dir }}/discovery_server.py"
+    state: absent
+  notify: Restart viewer
+
+- name: Advertise TrainCam via mDNS
+  ansible.builtin.template:
+    src: traincam-avahi.service.j2
+    dest: /etc/avahi/services/traincam.service
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Restart Avahi
+
 - name: Deploy viewer http service unit
   ansible.builtin.copy:
     dest: /etc/systemd/system/traincam-viewer.service
@@ -164,27 +195,31 @@
     mode: '0644'
     content: |
       [Unit]
-      Description=TrainCam static viewer (python http.server)
-      After=network-online.target
+      Description=TrainCam viewer server
+      After=network-online.target avahi-daemon.service
+      Wants=avahi-daemon.service
+      StartLimitIntervalSec=0
+      StartLimitBurst=0
 
       [Service]
       Type=simple
       User={{ traincam_user }}
       Group={{ traincam_group }}
       WorkingDirectory=/home/{{ traincam_user }}/www
-      ExecStart=/usr/bin/python3 -m http.server {{ traincam_viewer_port | default(8080) }} --bind 0.0.0.0
+      ExecStart=/usr/bin/python3 {{ traincam_bin_dir }}/viewer_server.py {{ traincam_viewer_port | default(8080) }} {{ traincam_port | default(8554) }} {{ traincam_webrtc_port | default(8889) }}
       Restart=always
       RestartSec=2
 
       [Install]
       WantedBy=multi-user.target
-  notify: Reload systemd and restart viewer
+  notify: Restart viewer
 
 - name: Ensure viewer service enabled and started
   ansible.builtin.systemd:
     name: traincam-viewer.service
     enabled: true
     state: started
+    daemon_reload: true
 
 # NetworkManager configuration for reliable WiFi roaming
 - name: Deploy NetworkManager WiFi roaming config
@@ -207,4 +242,3 @@
     cmd: nmcli connection modify preconfigured connection.autoconnect-priority 5
   changed_when: false
   failed_when: false
-

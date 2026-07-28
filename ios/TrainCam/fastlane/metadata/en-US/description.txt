@@ -18,7 +18,7 @@ Mount a small camera on your train and connect it to your local WiFi network. Ra
 COMPATIBLE HARDWARE
 
 • ESP32-S3 XIAO Sense with camera module (MJPEG streaming)
-• Raspberry Pi Zero W or later with rpicam-vid and MediaMTX (WebRTC streaming)
+• Raspberry Pi Zero 2 W or later with rpicam-vid and MediaMTX (WebRTC streaming)
 
 RailCam also works with any standard MJPEG stream source or WebRTC/WHEP-compatible server.
 

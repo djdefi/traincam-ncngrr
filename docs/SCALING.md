@@ -6,7 +6,7 @@ This guide explains how to add additional camera units to your layout.
 
 ### 1. Prepare the Hardware
 
-Set up a new Raspberry Pi Zero W with:
+Set up a new Raspberry Pi Zero 2 W with:
 - Raspberry Pi OS (Bookworm or later)
 - Camera module connected
 - WiFi configured to connect to `traincameranet`
@@ -95,8 +95,8 @@ Each camera needs:
 - Sufficient WiFi bandwidth (~2-5 Mbps per camera at 720p)
 
 For more than 3-4 cameras, consider:
-- 5GHz WiFi for higher bandwidth
-- Dedicated WiFi access point for cameras
+- A dedicated 2.4GHz access point for the cameras
+- A wired connection for the display
 - Reducing resolution/framerate on some cameras
 
 ## Ansible Variables Reference
@@ -107,6 +107,6 @@ For more than 3-4 cameras, consider:
 | `traincam_height` | 720 | Video height in pixels |
 | `traincam_fps` | 24 | Frames per second |
 | `LATENCY_MODE` | ultra_plus | Latency preset (low/ultra/ultra_plus) |
-| `traincam_awbgains` | "1.00,1.12" | Auto white balance gains |
+| `traincam_awb` | `auto` | Auto white balance mode |
 
 See `group_vars/traincam.yml` for all available options.

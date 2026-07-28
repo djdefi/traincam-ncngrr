@@ -8,12 +8,11 @@
 traincam_width: 1280
 traincam_height: 720
 traincam_fps: 24
-traincam_awbgains: "1.00,1.12"
-traincam_extra_opts: "--denoise off"
+traincam_awb: auto
+traincam_extra_opts: "--denoise cdn_off --saturation 1.1"
 
 # Optional tuning (uncomment to override):
 # traincam_keyframe_interval: 48      # Defaults based on LATENCY_MODE
-# traincam_qp: 32                     # Lower = higher quality
 
 # Latency mode: low (~1s GOP), ultra (~0.5s), ultra_plus (~0.25s)
 LATENCY_MODE: ultra_plus
@@ -43,3 +42,4 @@ traincam_log_dir: /var/log/traincam
 # ─────────────────────────────────────────────────────────────
 mediamtx_version: "v1.15.2"
 mediamtx_download_url: "https://github.com/bluenviron/mediamtx/releases/download/{{ mediamtx_version }}/mediamtx_{{ mediamtx_version }}_linux_arm64.tar.gz"
+mediamtx_checksum: "sha256:c9ad9ae5f93c1a84a3a52055f630687498b98566e735b5177ed604fefa7072b5"

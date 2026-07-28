@@ -16,7 +16,7 @@ A tiny camera rides on a model train and streams the engineer's view to any scre
 
 | Option | Size | Best For |
 |--------|------|----------|
-| **Raspberry Pi Zero W** | Credit card | Higher quality, more features |
+| **Raspberry Pi Zero 2 W** | Credit card | Validated 720p WebRTC camera |
 | **ESP32-S3 XIAO** | Postage stamp | Tighter spaces, simpler setup |
 
 See [docs/HARDWARE.md](docs/HARDWARE.md) for the full power chain (rectifier → buck converter → battery → camera).
@@ -45,7 +45,7 @@ open http://traincam1.local:8080/viewer.html
 1. Open `CameraWebServer/CameraWebServer.ino` in Arduino IDE
 2. Set your WiFi credentials (lines 12-13)
 3. Upload to XIAO ESP32S3 Sense
-4. Open `http://<esp32-ip>/` in browser
+4. Open the `http://traincam-xxxxxx.local/stream` URL printed over Serial
 
 ## Project Structure
 
@@ -124,7 +124,7 @@ open ios/TrainCam/TrainCam.xcodeproj
 ## Roadmap
 
 - [ ] Multiple cameras (cab, yard, rear view)
-- [ ] ESP32 mDNS discovery ([issue](issues/1.md))
+- [x] ESP32 mDNS discovery
 - [ ] Recording & playback
 - [ ] Audio from train
 
