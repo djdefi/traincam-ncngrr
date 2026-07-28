@@ -57,3 +57,12 @@ traincam_log_dir: /var/log/traincam
 mediamtx_version: "v1.15.2"
 mediamtx_download_url: "https://github.com/bluenviron/mediamtx/releases/download/{{ mediamtx_version }}/mediamtx_{{ mediamtx_version }}_linux_arm64.tar.gz"
 mediamtx_checksum: "sha256:c9ad9ae5f93c1a84a3a52055f630687498b98566e735b5177ed604fefa7072b5"
+
+# ─────────────────────────────────────────────────────────────
+# UNATTENDED OPERATION
+# ─────────────────────────────────────────────────────────────
+# The bcm2835 watchdog hardware maxes out at 15s; systemd pets it at half
+# this interval. Raising it past 15 silently disables the watchdog.
+traincam_watchdog_sec: 14
+# Persistent journal, bounded so an all-day run can't fill the card.
+traincam_journal_max_use: 64M

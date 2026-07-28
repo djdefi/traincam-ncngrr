@@ -298,5 +298,62 @@
       line: 'enable_tvout=0'
     - regexp: '^dtoverlay=disable-bt$'
       line: 'dtoverlay=disable-bt'
+    - regexp: '^dtparam=watchdog='
+      line: 'dtparam=watchdog=on'
   loop_control:
     label: "{{ item.line }}"
+
+# Restart=always only helps when systemd is still alive. A hung kernel takes
+# systemd with it, and the car has to be pulled off the layout to power-cycle.
+# The BCM2835 watchdog resets the SoC without anyone touching the train.
+- name: Create systemd drop-in directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+  loop:
+    - /etc/systemd/system.conf.d
+    - /etc/systemd/journald.conf.d
+
+- name: Fail fast if the watchdog interval exceeds the hardware limit
+  ansible.builtin.assert:
+    that:
+      - traincam_watchdog_sec | int > 0
+      - traincam_watchdog_sec | int <= 15
+    fail_msg: >-
+      traincam_watchdog_sec is {{ traincam_watchdog_sec }}. The bcm2835
+      watchdog cannot exceed 15s; systemd would accept the value and then
+      silently run without a watchdog, which is worse than not having one.
+
+- name: Let systemd drive the hardware watchdog
+  ansible.builtin.copy:
+    content: |
+      # Managed by Ansible (traincam role)
+      [Manager]
+      # ponytail: the bcm2835 watchdog caps out at 15s, so this is the ceiling,
+      # not a tuning choice.
+      RuntimeWatchdogSec={{ traincam_watchdog_sec }}
+      RebootWatchdogSec=2min
+    dest: /etc/systemd/system.conf.d/10-traincam-watchdog.conf
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Reload systemd manager
+
+# The last hang left no evidence because the journal only lived in RAM.
+- name: Keep the journal across reboots
+  ansible.builtin.copy:
+    content: |
+      # Managed by Ansible (traincam role)
+      [Journal]
+      Storage=persistent
+      # Bounded so an unattended run cannot fill the card or chew SD endurance.
+      SystemMaxUse={{ traincam_journal_max_use }}
+      SystemMaxFileSize=8M
+    dest: /etc/systemd/journald.conf.d/10-traincam-persist.conf
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Restart journald

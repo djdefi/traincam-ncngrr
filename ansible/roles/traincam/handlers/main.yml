@@ -34,3 +34,14 @@
   ansible.builtin.systemd:
     name: avahi-daemon.service
     state: restarted
+
+# systemd only picks up a changed RuntimeWatchdogSec on re-exec, not on
+# daemon-reload.
+- name: Reload systemd manager
+  ansible.builtin.systemd:
+    daemon_reexec: true
+
+- name: Restart journald
+  ansible.builtin.systemd:
+    name: systemd-journald.service
+    state: restarted
