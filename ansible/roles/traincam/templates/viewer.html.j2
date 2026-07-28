@@ -38,6 +38,8 @@ const PATH = 'traincam';
 // Derive MediaMTX base (viewer served on 8080; mediamtx on 8889 by default)
 const MTX_BASE = (() => { try { const u = new URL(window.location.href); u.port='{{ traincam_webrtc_port | default(8889) }}'; return u.origin; } catch(_) { return window.location.origin; } })();
 const AUTOREC_DELAY_MS = 1500;
+const AUTOREC_MAX_MS = 15000;
+let retryDelay = AUTOREC_DELAY_MS;
 let pc, abortController, reconnectTimer, uiHideTimer;
 const statusEl = document.getElementById('status');
 const videoEl = document.getElementById('video');
@@ -85,7 +87,7 @@ async function connect(){
   conn.addEventListener('connectionstatechange', () => {
     if (pc !== conn) return;
     if (['disconnected','failed','closed'].includes(conn.connectionState)) fail('State: ' + conn.connectionState);
-    else log('State: ' + conn.connectionState);
+    else { if (conn.connectionState === 'connected') retryDelay = AUTOREC_DELAY_MS; log('State: ' + conn.connectionState); }
   });
   conn.addTransceiver('video',{direction:'recvonly'});
   try {
@@ -107,8 +109,20 @@ async function connect(){
 }
 
 function cleanup(){ releaseResource(); if (abortController) abortController.abort(); if (pc){ try{ pc.close(); }catch(_){} } pc=null; connectBtn.disabled=false; disconnectBtn.disabled=true; showUI(); }
-function scheduleReconnect(){ if (reconnectTimer) return; reconnectTimer=setTimeout(()=>{ reconnectTimer=null; connect(); }, AUTOREC_DELAY_MS); log('Reconnecting in '+AUTOREC_DELAY_MS+'ms...'); }
-connectBtn.onclick = () => { if (reconnectTimer){ clearTimeout(reconnectTimer); reconnectTimer=null;} connect(); showUI(); };
+// ponytail: jittered exponential backoff, not a fixed retry. Measured Jul 28:
+// ONE tab opened 143 WHEP sessions in 5 minutes, creations 1.57-1.63s apart
+// (= AUTOREC_DELAY_MS + round trip), all from a single source port, while the
+// SDIO radio was already failing. The jitter matters more than the backoff at
+// a show: without it every phone in the hall retries on the same tick and they
+// hit the AP together.
+function scheduleReconnect(){
+  if (reconnectTimer) return;
+  const wait = Math.round(retryDelay * (0.75 + Math.random()*0.5));
+  retryDelay = Math.min(retryDelay*2, AUTOREC_MAX_MS);
+  reconnectTimer = setTimeout(()=>{ reconnectTimer=null; connect(); }, wait);
+  log('Reconnecting in '+wait+'ms...');
+}
+connectBtn.onclick = () => { if (reconnectTimer){ clearTimeout(reconnectTimer); reconnectTimer=null;} retryDelay=AUTOREC_DELAY_MS; connect(); showUI(); };
 disconnectBtn.onclick = () => { if (reconnectTimer){ clearTimeout(reconnectTimer); reconnectTimer=null;} autorec.checked=false; cleanup(); log('Disconnected'); };
 fsBtn.onclick = () => { attemptFullscreen(false); showUI(); };
 fitBtn.onclick = () => { if (videoEl.style.objectFit==='contain'){ videoEl.style.objectFit='cover'; fitBtn.textContent='Fit'; } else { videoEl.style.objectFit='contain'; fitBtn.textContent='Fill'; } showUI(); };

@@ -77,7 +77,14 @@ globalThis.fetch = (url, opts) => {
 };
 globalThis.console = { log() {} };
 let pendingReconnect = null;
-globalThis.setTimeout = (fn, ms) => { if (ms === 1500) { reconnects++; pendingReconnect = fn; } return { ms }; };
+// Record every timer. 600 (fullscreen) and 2000 (UI hide) are the only two
+// non-reconnect timers in the viewer; everything else is a retry, whose delay
+// is now jittered and so cannot be matched by a fixed value.
+const delays = [];
+globalThis.setTimeout = (fn, ms) => {
+  if (ms !== 600 && ms !== 2000) { reconnects++; pendingReconnect = fn; delays.push(ms); }
+  return { ms };
+};
 globalThis.clearTimeout = () => {};
 const flush = async () => { for (let i = 0; i < 4; i++) await new Promise(r => setImmediate(r)); };
 
@@ -145,6 +152,49 @@ vm.runInThisContext(fs.readFileSync(process.argv[2], 'utf8'));
   const again = fetches.filter(f => (f.opts.method || '').toUpperCase() === 'DELETE').length;
   assert.strictEqual(again, after, 'a second cleanup should not re-DELETE');
   process.stdout.write('✓ double cleanup does not double-DELETE\n');
+
+  // 8. Retries must back off. A fixed 1.5s retry had one tab create 143 WHEP
+  //    sessions in 5 minutes (measured 1.57-1.63s apart, one source port)
+  //    while the radio was already failing. Pin Math.random mid-range so the
+  //    jitter is a no-op and the ladder itself is exact.
+  const realRandom = Math.random;
+  Math.random = () => 0.5;
+  FakePC.failOffer = false;
+  await connect(); await flush();
+  let live = () => peers[peers.length - 1];
+  live().fire('connectionstatechange', 'connected');   // resets the ladder
+  delays.length = 0;
+  FakePC.failOffer = true;
+  live().fire('connectionstatechange', 'failed');      // -> 1500
+  for (let i = 0; i < 5; i++) { pendingReconnect(); await flush(); }
+  assert.deepStrictEqual(delays.slice(0, 5), [1500, 3000, 6000, 12000, 15000],
+    'retries should double and cap at 15s, got ' + JSON.stringify(delays.slice(0, 5)));
+  process.stdout.write('✓ retries back off and cap at 15s\n');
+
+  // 9. A successful connect resets the ladder, or one bad patch of track
+  //    leaves the viewer retrying every 15s for the rest of the day.
+  FakePC.failOffer = false;
+  pendingReconnect(); await flush();
+  live().fire('connectionstatechange', 'connected');
+  delays.length = 0;
+  FakePC.failOffer = true;
+  live().fire('connectionstatechange', 'failed');
+  assert.strictEqual(delays[0], 1500, 'a connected peer should reset the backoff, got ' + delays[0]);
+  process.stdout.write('✓ a successful connect resets the backoff\n');
+
+  // 10. The delay must actually depend on Math.random. Without jitter every
+  //     phone in the hall retries on the same tick and hits the AP as one.
+  FakePC.failOffer = false;
+  pendingReconnect(); await flush();
+  live().fire('connectionstatechange', 'connected');   // base is 1500 again
+  Math.random = () => 0;
+  delays.length = 0;
+  FakePC.failOffer = true;
+  live().fire('connectionstatechange', 'failed');
+  Math.random = realRandom;
+  assert.strictEqual(delays[0], 1125,
+    'retry delay must be jittered by +/-25% of 1500, got ' + delays[0]);
+  process.stdout.write('✓ retry delay is jittered\n');
 })().catch(err => { process.stdout.write('✗ ' + err.message + '\n'); process.exit(1); });
 HARNESS
 
