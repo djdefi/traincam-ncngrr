@@ -34,8 +34,25 @@ traincam_extra_opts: "--denoise cdn_off --saturation 1.1 --bitrate 2500000"
 # Optional tuning (uncomment to override):
 # traincam_keyframe_interval: 48      # Defaults based on LATENCY_MODE
 
+# Keyframe interval, NOT stream latency - the names predate the WebRTC path and
+# are misleading. GOP length does not change end-to-end latency for a live WHEP
+# stream; it changes time-to-first-picture on join, and how long a lost packet
+# stays visible as corruption. What it very much does change is quality, because
+# keyframes are expensive.
+#
+# Measured on the live stream at the 2500kbps cap (ffprobe, 8s windows):
+#   intra  6 (ultra_plus): 38.2% of ALL bits went to keyframes, P avg  9756 B
+#   intra 24 (low):        17.3%,                               P avg 11239 B
+#   intra 48:              11.5%,                               P avg 11810 B
+# So `low` buys ~15% more bits per P-frame - i.e. actual picture detail - for
+# free, at the cost of up to 1s to first picture instead of 0.25s.
+#
+# Not going further to 48: MediaMTX passes through an already-encoded stream, so
+# it cannot ask rpicam-vid for a keyframe on demand (no PLI/FIR path). That makes
+# GOP length the *only* thing bounding how long a dropped packet stays smeared on
+# screen, and a hall full of phones is a lossy place. 1s is the balance.
 # Latency mode: low (~1s GOP), ultra (~0.5s), ultra_plus (~0.25s)
-LATENCY_MODE: ultra_plus
+LATENCY_MODE: low
 
 # ─────────────────────────────────────────────────────────────
 # NETWORK / PORTS
