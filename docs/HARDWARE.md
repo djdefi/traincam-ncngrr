@@ -150,13 +150,20 @@ WiFi, CPU clocks, resolution, frame rate, and keyframe timing unchanged.
 | Pi won't boot | Buck converter voltage wrong | Verify 5V output with multimeter |
 | Overheating | Buck converter undersized | Use higher efficiency/capacity buck |
 | Weak WiFi | Camera position | Ensure antenna not blocked by metal |
-| Purple/magenta image | NoIR module using the IR-filtered tuning | Set `traincam_tuning_file` to `ov5647_noir.json` (see `group_vars/traincam.yml`) |
+| Purple/magenta image | NoIR module using the IR-filtered tuning | Point `traincam_tuning_source` at the `*_noir.json` for that sensor |
+| Green/cyan image | IR-filtered module using the NoIR tuning | The reverse — use the plain `*.json` |
 | Soft AND washed out, even with correct tuning | NoIR module in visible light | Physics, not config — see "NoIR is the wrong module for daylight" below |
-| Camera "not detected" after a swap | Third-party sensor invisible to `camera_auto_detect` | Set `traincam_camera_overlay` — see "Swapping the camera module" below |
+| Camera "not detected" after a swap | Third-party sensor invisible to `camera_auto_detect`, or a cable that does not fit | Set `traincam_camera_overlay` — see "Swapping the camera module" below |
+| Field of view much narrower than the lens | libcamera chose a cropped sensor mode to match the output aspect | Pin the mode — see "Check the sensor mode after any camera change" |
+| Dark, noisy, or smeared on a dim layout | Unbinned sensor mode, ¼ the light per pixel | Same — pin the full-FOV binned mode |
 
 ## NoIR is the wrong module for daylight
 
-The fitted OV5647 has no IR-cut filter. `ov5647_noir.json` corrects the colour
+**Resolved Jul 2026 — the fitted module is now an IR-filtered IMX219.** Kept
+because the symptoms are distinctive and worth recognising if a module is ever
+swapped back.
+
+The original OV5647 had no IR-cut filter. `ov5647_noir.json` corrects the colour
 matrix (measured in 388f808: U 143.3 → 123.9, V 148.4 → 124.8 against a neutral
 128) but it cannot undo the two physical costs, and no config setting will:
 
@@ -180,27 +187,62 @@ Arducam's `imx519` 16MP, `ov64a40` 64MP, the Pivariety low-light boards — is
 invisible to it, and the symptom is identical to a dead ribbon cable. Some
 third-party clones of supported sensors also fail the probe.
 
-1. **Power off**, then swap the sensor board but **keep the ribbon cable that
-   works today**. A Pi Zero 2 W needs the narrow 22-pin CSI cable, not the wide
-   15-pin one that ships with most modules — reusing the known-good cable
-   removes the most likely variable.
-2. Boot and check: `rpicam-vid --list-cameras`
-3. If it lists nothing, name the sensor explicitly in `group_vars/traincam.yml`
+1. **Power off.** Never swap a CSI cable live: the ribbon carries 3.3 V and I²C,
+   and the contacts bridge against each other on the way in.
+2. **Use the cable that fits the new module**, not the one that works today. A
+   Pi Zero 2 W is narrow 22-pin at its end, but the module end varies — the
+   OV5647 here uses narrow→wide (15-pin), which physically will not fit a module
+   with a 22-pin socket. A mismatched cable is a plausible reason a module
+   "was never detected". A 22-to-22 cable has shipping lead time; check first.
+3. Boot and check: `rpicam-vid --list-cameras`
+4. If it lists nothing, name the sensor explicitly in `group_vars/traincam.yml`
    and re-deploy, then reboot:
    ```yaml
    traincam_camera_overlay: imx219
    ```
    The deploy asserts the `.dtbo` exists, so a typo fails the run rather than
-   the camera. See what this Pi has:
+   the camera, and it sets `camera_auto_detect=0` to match — the explicit
+   overlay and the probe must not both run. Clearing the variable reverses
+   both. See what this Pi has:
    `ls /boot/firmware/overlays/ | grep -E 'imx|ov[0-9]'`
-4. If it still lists nothing after that, it is genuinely cable or hardware.
-5. **Set the matching tuning**, or the colour will be wrong in a new way:
+5. Read `dmesg` — the three outcomes are unambiguous, and this split is the
+   whole diagnostic:
+   | `sudo dmesg \| grep -i imx219` | Meaning |
+   |---|---|
+   | `failed to read chip id` | Driver loaded, sensor unreachable: cable, orientation, or dead module |
+   | Registers / dependency-cycle lines | Working |
+   | No mention at all | The overlay did not load |
+6. **Set the matching tuning**, or the colour will be wrong in a new way. Do
+   not guess — shoot the same scene through both and pick, it takes two
+   minutes:
    ```yaml
    traincam_tuning_source: /usr/share/libcamera/ipa/rpi/vc4/imx219.json       # IR-filtered
    # traincam_tuning_source: /usr/share/libcamera/ipa/rpi/vc4/imx219_noir.json  # NoIR
    ```
+7. **Check which sensor mode libcamera picked** — see below. This is the step
+   that is easiest to skip and costs the most.
 
-An IMX219 is also a genuine image upgrade over the OV5647: its full-FOV binned
-mode is 1640x1232, so a 1280x720 output is downsampled ~1.28x. The OV5647's
-equivalent mode is 1296x972 — effectively 1:1 with the output, so there is no
-supersampling to hide sensor softness.
+## Check the sensor mode after any camera change
+
+libcamera picks a sensor mode to match the *aspect ratio* of the requested
+output, which is often not the mode you want. On the IMX219 at 1280x720 it
+chooses 1920x1080 — an **unbinned crop** of the 3280x2464 array, measured at
+left 688, top 700. That is 58% of the sensor width: a keyhole instead of the
+room, and a quarter of the light per pixel because nothing is binned.
+
+`--mode 1640:1232` in `traincam_extra_opts` pins the full-FOV 2×2-binned mode
+instead. Confirm which one is live — this reads the hardware, not the config:
+
+```bash
+v4l2-ctl -d /dev/v4l-subdev0 --get-subdev-fmt | grep -i width
+v4l2-ctl -d /dev/v4l-subdev0 --get-subdev-selection target=crop
+```
+
+Full FOV reads `crop, Left 8, Top 8, Width 3280, Height 2464`. Anything else is
+a crop.
+
+Binning matters here more than it looks. Measured in a *lit* room at 33–41 lux
+the AGC was already pegged at its ceiling — 66502 µs at gain 5.95 — and a layout
+with tunnels is darker. Binning is 4× the photons per output pixel. The same
+conclusion came out of testing the OV5647's unbinned 1920x1080 mode, which was
+rejected as visibly darker and noisier.
