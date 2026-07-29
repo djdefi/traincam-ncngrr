@@ -159,13 +159,11 @@ WiFi, CPU clocks, resolution, frame rate, and keyframe timing unchanged.
 
 ## NoIR is the wrong module for daylight
 
-**Resolved Jul 2026 — the fitted module is now an IR-filtered IMX219.** Kept
-because the symptoms are distinctive and worth recognising if a module is ever
-swapped back.
+**Both modules used here have been NoIR.** The IMX219 fitted Jul 2026 is one
+too, so this still applies.
 
-The original OV5647 had no IR-cut filter. `ov5647_noir.json` corrects the colour
-matrix (measured in 388f808: U 143.3 → 123.9, V 148.4 → 124.8 against a neutral
-128) but it cannot undo the two physical costs, and no config setting will:
+The module has no IR-cut filter. The `*_noir.json` tuning corrects the colour
+matrix but it cannot undo the two physical costs, and no config setting will:
 
 - **Washed out.** Infrared floods every photosite. The tuning rebalances the
   result; it cannot remove the light that already landed.
@@ -175,9 +173,40 @@ matrix (measured in 388f808: U 143.3 → 123.9, V 148.4 → 124.8 against a neut
 NoIR modules exist for night vision with an IR illuminator. For a lit layout an
 IR-filtered module is the correct part, and swapping is the only real fix.
 
+**How bad it is depends entirely on the lighting**, so measure at the venue
+before buying anything. Incandescent, halogen and daylight are IR-rich and will
+show all of the above. Modern LED and fluorescent emit almost no IR, so under a
+typical LED-lit hall a NoIR module with the `_noir` tuning can be close to fine.
+
 **Telling them apart, no tools:** point a TV remote at the lens and hold a
 button. On the stream, a NoIR module shows the remote's LED as an obvious bright
 white/violet dot. An IR-filtered module shows nothing at all.
+
+**Telling them apart by measurement**, which is the reliable way — the eye gets
+this backwards, because a correct rendering looks green immediately after a
+magenta one, and any coloured room lighting defeats judgement entirely. Shoot
+the same scene through both tuning files back to back, then sample a genuinely
+neutral surface (white trim, a sheet of paper) and take the channel ratios:
+
+```bash
+for t in imx219 imx219_noir; do
+  rpicam-jpeg -n -t 3000 -o /tmp/$t.jpg --width 1280 --height 720 \
+    --tuning-file /usr/share/libcamera/ipa/rpi/vc4/$t.json
+done
+```
+
+```python
+from PIL import Image; import numpy as np
+m = np.asarray(Image.open("/tmp/imx219.jpg").convert("RGB")).astype(float)
+m = m[Y0:Y1, X0:X1].reshape(-1, 3).mean(0)   # a white/neutral patch
+print(m[0] / m[1], m[2] / m[1])              # neutral is 1.0, 1.0
+```
+
+Neutral is `R/G = B/G = 1.0`; above 1 is magenta, below is green. Measured here
+on white door trim: `imx219.json` gave 1.521/1.437, `imx219_noir.json` gave
+1.019/0.969. Anything near 1.5 on a white surface is the wrong file. Note that
+R and B being elevated *together* is the IR signature — coloured room lighting
+would push one channel much harder than the other.
 
 ## Swapping the camera module
 

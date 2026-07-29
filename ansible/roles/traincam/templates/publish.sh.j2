@@ -13,6 +13,7 @@ fi
 : "${HEIGHT:={{ traincam_height }}}"
 : "${FPS:={{ traincam_fps }}}"
 : "${AWB:={{ traincam_awb }}}"
+: "${AWB_GAINS:={{ traincam_awb_gains | default('') }}}"
 : "${TUNING_FILE:={{ traincam_tuning_file | default('') }}}"
 : "${EXTRA_OPTS:={{ traincam_extra_opts }}}"
 : "${LATENCY_MODE:=}" # expected: low|ultra|ultra_plus
@@ -69,8 +70,21 @@ fi
 CAMERA_ARGS=(
   -t 0 --inline --nopreview --verbose 0
   --width "$WIDTH" --height "$HEIGHT" --framerate "$FPS"
-  --awb "$AWB" --intra "$KEYFRAME_INTERVAL"
+  --intra "$KEYFRAME_INTERVAL"
 )
+# Auto white balance converges differently in the video pipeline than in the
+# still one - measured on the same scene, seconds apart: stills settled on
+# ColourGains [0.989, 2.230], video on [0.863, 2.037]. Less red and less blue
+# is a green cast, and it measured 21% off neutral on white paint. Fixed gains
+# also stop the colour pumping as a moving camera passes coloured scenery.
+# MUST be recalibrated for the venue - see docs/HARDWARE.md. Empty = auto.
+if [[ -n "$AWB_GAINS" ]]; then
+  CAMERA_ARGS+=(--awbgains "$AWB_GAINS")
+  log "white balance: locked to gains $AWB_GAINS"
+else
+  CAMERA_ARGS+=(--awb "$AWB")
+  log "white balance: auto (mode $AWB)"
+fi
 CAMERA_ARGS+=("${EXTRA_ARRAY[@]}")
 
 # rpicam-vid produces H264 to stdout; ffmpeg remuxes into RTSP to MediaMTX

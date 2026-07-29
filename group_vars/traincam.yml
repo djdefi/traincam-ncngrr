@@ -34,14 +34,34 @@ traincam_height: 720
 traincam_camera_overlay: "imx219"
 traincam_fps: 24
 traincam_awb: auto
+# Locked white balance, "RED,BLUE". Empty falls back to --awb above.
+#
+# Auto white balance converges DIFFERENTLY in the video pipeline than in the
+# still one. Measured on the same scene seconds apart: stills settled on
+# ColourGains [0.989, 2.230], video on [0.863, 2.037]. Less red and less blue
+# is a green cast - white paint landed 21% off neutral in the actual stream
+# while a still of the same wall was within 4%. Locking the gains also stops
+# colour pumping as a moving camera passes coloured scenery, which is worth
+# something on its own for an unattended run.
+#
+# !! THESE NUMBERS ARE FOR ONE ROOM AND MUST BE REDONE AT THE VENUE !!
+# The procedure is in docs/HARDWARE.md and takes about a minute with a sheet
+# of white paper. Setting this to "" restores auto, which is wrong by a
+# measurable amount but never catastrophically wrong.
+traincam_awb_gains: "0.99,2.23"
 # libcamera tuning. Must match the fitted module - this is where colour comes
-# from. The old ov5647 was a NoIR (no IR-cut filter) and needed ov5647_noir.json
-# or everything came out magenta. The IMX219 now fitted IS IR-filtered, proved
-# by shooting the same scene through both: imx219.json renders neutral walls
-# and correct skin tone, imx219_noir.json over-corrects to a green/cyan cast.
-# If a module is ever swapped, shoot both and pick - it takes two minutes and
-# guessing gets the colour wrong in a way that looks like a camera fault.
-traincam_tuning_source: /usr/share/libcamera/ipa/rpi/vc4/imx219.json
+# from. Both modules used here have been NoIR (no IR-cut filter), so both need
+# the _noir variant or everything renders magenta: infrared leaks into the red
+# and blue photosites roughly equally, which reads as a green deficit.
+#
+# MEASURE THIS, DO NOT EYEBALL IT. Shooting the same scene through both files
+# and judging by eye got it backwards here - a correct rendering looks green
+# straight after a magenta one, and a room with RGB lighting defeats the eye
+# completely. Shoot both back to back, then sample a genuinely neutral surface
+# (white trim, white paper) and take the ratios; neutral is R/G = B/G = 1.0.
+# Measured on white door trim: imx219.json 1.521/1.437, imx219_noir.json
+# 1.019/0.969. Anything near 1.5 on a white surface is the wrong file.
+traincam_tuning_source: /usr/share/libcamera/ipa/rpi/vc4/imx219_noir.json
 traincam_tuning_file: /etc/traincam/tuning.json
 # AGC shutter/gain ladder, walked in order as the scene darkens. The stock
 # ladder reaches 30000us before it raises gain past 4, which parks a moving
