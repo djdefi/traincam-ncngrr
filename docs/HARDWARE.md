@@ -151,3 +151,56 @@ WiFi, CPU clocks, resolution, frame rate, and keyframe timing unchanged.
 | Overheating | Buck converter undersized | Use higher efficiency/capacity buck |
 | Weak WiFi | Camera position | Ensure antenna not blocked by metal |
 | Purple/magenta image | NoIR module using the IR-filtered tuning | Set `traincam_tuning_file` to `ov5647_noir.json` (see `group_vars/traincam.yml`) |
+| Soft AND washed out, even with correct tuning | NoIR module in visible light | Physics, not config — see "NoIR is the wrong module for daylight" below |
+| Camera "not detected" after a swap | Third-party sensor invisible to `camera_auto_detect` | Set `traincam_camera_overlay` — see "Swapping the camera module" below |
+
+## NoIR is the wrong module for daylight
+
+The fitted OV5647 has no IR-cut filter. `ov5647_noir.json` corrects the colour
+matrix (measured in 388f808: U 143.3 → 123.9, V 148.4 → 124.8 against a neutral
+128) but it cannot undo the two physical costs, and no config setting will:
+
+- **Washed out.** Infrared floods every photosite. The tuning rebalances the
+  result; it cannot remove the light that already landed.
+- **Soft.** IR focuses at a different plane than visible light, so the IR
+  component lands defocused on top of the sharp visible image.
+
+NoIR modules exist for night vision with an IR illuminator. For a lit layout an
+IR-filtered module is the correct part, and swapping is the only real fix.
+
+**Telling them apart, no tools:** point a TV remote at the lens and hold a
+button. On the stream, a NoIR module shows the remote's LED as an obvious bright
+white/violet dot. An IR-filtered module shows nothing at all.
+
+## Swapping the camera module
+
+`camera_auto_detect=1` probes **only** the official Raspberry Pi sensors:
+`ov5647` (v1), `imx219` (v2), `imx477` (HQ), `imx708` (v3). Anything else —
+Arducam's `imx519` 16MP, `ov64a40` 64MP, the Pivariety low-light boards — is
+invisible to it, and the symptom is identical to a dead ribbon cable. Some
+third-party clones of supported sensors also fail the probe.
+
+1. **Power off**, then swap the sensor board but **keep the ribbon cable that
+   works today**. A Pi Zero 2 W needs the narrow 22-pin CSI cable, not the wide
+   15-pin one that ships with most modules — reusing the known-good cable
+   removes the most likely variable.
+2. Boot and check: `rpicam-vid --list-cameras`
+3. If it lists nothing, name the sensor explicitly in `group_vars/traincam.yml`
+   and re-deploy, then reboot:
+   ```yaml
+   traincam_camera_overlay: imx219
+   ```
+   The deploy asserts the `.dtbo` exists, so a typo fails the run rather than
+   the camera. See what this Pi has:
+   `ls /boot/firmware/overlays/ | grep -E 'imx|ov[0-9]'`
+4. If it still lists nothing after that, it is genuinely cable or hardware.
+5. **Set the matching tuning**, or the colour will be wrong in a new way:
+   ```yaml
+   traincam_tuning_source: /usr/share/libcamera/ipa/rpi/vc4/imx219.json       # IR-filtered
+   # traincam_tuning_source: /usr/share/libcamera/ipa/rpi/vc4/imx219_noir.json  # NoIR
+   ```
+
+An IMX219 is also a genuine image upgrade over the OV5647: its full-FOV binned
+mode is 1640x1232, so a 1280x720 output is downsampled ~1.28x. The OV5647's
+equivalent mode is 1296x972 — effectively 1:1 with the output, so there is no
+supersampling to hide sensor softness.
