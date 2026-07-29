@@ -1,10 +1,16 @@
 #include "esp_http_server.h"
 #include "esp_camera.h"
 #include "img_converters.h"
+#include <WiFi.h>
 
 #if defined(ARDUINO_ARCH_ESP32) && defined(CONFIG_ARDUHAL_ESP_LOG)
 #include "esp32-hal-log.h"
 #endif
+
+// Defined in CameraWebServer.ino, kept in RTC memory so they survive the
+// reboots the WiFi recovery performs.
+extern uint32_t bootCount;
+extern uint32_t wifiRestartCount;
 
 #define PART_BOUNDARY "123456789000000000000987654321"
 static const char *_STREAM_CONTENT_TYPE = "multipart/x-mixed-replace;boundary=" PART_BOUNDARY;
@@ -84,10 +90,35 @@ static esp_err_t index_handler(httpd_req_t *req) {
   return httpd_resp_send(req, NULL, 0);
 }
 
+// Health without pulling the video stream. In a train car there is no serial
+// console and no display, so without this the only question you can answer is
+// "is it up right now" - not "has it been rebooting all afternoon", which is
+// exactly what the WiFi recovery above needs to be checked against.
+static esp_err_t status_handler(httpd_req_t *req) {
+  char buf[224];
+  int len = snprintf(
+    buf, sizeof(buf),
+    "{\"uptime_s\":%lu,\"heap\":%lu,\"min_heap\":%lu,\"rssi\":%d,"
+    "\"boots\":%lu,\"wifi_restarts\":%lu}",
+    (unsigned long)(millis() / 1000), (unsigned long)ESP.getFreeHeap(),
+    (unsigned long)ESP.getMinFreeHeap(), WiFi.RSSI(),
+    (unsigned long)bootCount, (unsigned long)wifiRestartCount);
+
+  httpd_resp_set_type(req, "application/json");
+  httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+  return httpd_resp_send(req, buf, len);
+}
+
 void startCameraServer() {
   httpd_config_t config = HTTPD_DEFAULT_CONFIG();
   config.server_port = 80;
   config.ctrl_port = 32768;
+  // A phone that wanders out of range mid-stream leaves its socket held open.
+  // With a handful of sockets available, a few of those and the camera quietly
+  // stops accepting new viewers - which at a fair looks like "it broke" and is
+  // unfixable without a power cycle. LRU purge evicts the stalest connection
+  // instead of refusing the new one.
+  config.lru_purge_enable = true;
 
   httpd_uri_t index_uri = {
     .uri       = "/",
@@ -103,9 +134,17 @@ void startCameraServer() {
     .user_ctx  = NULL
   };
 
+  httpd_uri_t status_uri = {
+    .uri       = "/status",
+    .method    = HTTP_GET,
+    .handler   = status_handler,
+    .user_ctx  = NULL
+  };
+
   log_i("Starting web server on port: '%d'", config.server_port);
   if (httpd_start(&stream_httpd, &config) == ESP_OK) {
     httpd_register_uri_handler(stream_httpd, &index_uri);
     httpd_register_uri_handler(stream_httpd, &stream_uri);
+    httpd_register_uri_handler(stream_httpd, &status_uri);
   }
 }

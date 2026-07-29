@@ -1,6 +1,7 @@
 #include "esp_camera.h"
 #include <ESPmDNS.h>
 #include <WiFi.h>
+#include <esp_task_wdt.h>
 
 #define CAMERA_MODEL_XIAO_ESP32S3 // Has PSRAM
 
@@ -14,13 +15,68 @@
 const char* ssid = "traincameranet";
 const char* password = "locomotive";  // Default password - change for production
 
-void setup() {
-  if (Serial) {
-    Serial.begin(115200);
-    while(!Serial);
-    Serial.setDebugOutput(true);
-    Serial.println();
+// At a fair everything is switched on at once, so the access point is often not
+// up yet when this board boots. Give it a bounded wait, then reboot and try
+// again, instead of blocking in setup() forever.
+static const uint32_t WIFI_CONNECT_TIMEOUT_MS = 30000;
+// How long the link may stay down while running before we give up on it.
+static const uint32_t WIFI_GRACE_MS = 30000;
+static const uint32_t WDT_TIMEOUT_MS = 60000;
+
+// RTC memory survives a soft reset but not a power cycle, which is exactly the
+// scope we want: "how much has this board struggled since someone plugged it
+// in". Without these the only way to know it had been rebooting all afternoon
+// would be to notice the stream blink, and nobody is watching for that.
+RTC_DATA_ATTR uint32_t bootCount = 0;
+RTC_DATA_ATTR uint32_t wifiRestartCount = 0;
+
+// Last time the link was seen up. Not in RTC memory: it is meaningless across a
+// reboot, and a stale value would trigger an immediate second restart.
+static uint32_t lastConnectedMs = 0;
+
+// Bounded connect. Returns false rather than blocking, so every caller has to
+// decide what to do about failure.
+static bool connectWiFi(uint32_t timeoutMs) {
+  WiFi.mode(WIFI_STA);
+  WiFi.setSleep(false);        // power save wakes badly under load; we are not on a coin cell
+  WiFi.setAutoReconnect(true); // lets brief drops heal without a reboot
+  WiFi.begin(ssid, password);
+
+  const uint32_t start = millis();
+  while (WiFi.status() != WL_CONNECTED) {
+    // Unsigned subtraction, so this stays correct across the ~49 day millis()
+    // rollover. Do not "fix" it to millis() > start + timeoutMs.
+    if (millis() - start > timeoutMs) {
+      return false;
+    }
+    delay(250);
+    esp_task_wdt_reset();
   }
+  return true;
+}
+
+void setup() {
+  // Serial was previously guarded by `if (Serial)` BEFORE Serial.begin(), so on
+  // a board with native USB CDC it could skip init entirely - and then the
+  // camera failure message below printed nowhere. On a device with no display
+  // that is the only diagnostic channel there is.
+  Serial.begin(115200);
+  Serial.setDebugOutput(true);
+  Serial.println();
+
+  bootCount++;
+
+  // Core 3.x already starts the task WDT, so init returns INVALID_STATE and we
+  // reconfigure instead. Guards against a hang anywhere in the loop task.
+  esp_task_wdt_config_t wdtConfig = {
+    .timeout_ms = WDT_TIMEOUT_MS,
+    .idle_core_mask = 0,
+    .trigger_panic = true,
+  };
+  if (esp_task_wdt_init(&wdtConfig) == ESP_ERR_INVALID_STATE) {
+    esp_task_wdt_reconfigure(&wdtConfig);
+  }
+  esp_task_wdt_add(NULL);  // already-added returns INVALID_ARG, which is harmless
 
   camera_config_t config;
   config.ledc_channel = LEDC_CHANNEL_0;
@@ -86,19 +142,21 @@ void setup() {
     s->set_saturation(s, -2); // lower the saturation
   }
   // drop down frame size for higher initial frame rate
+  // ponytail: QVGA is small for a kiosk monitor. Left alone deliberately -
+  // raising it trades frame rate, and that is a call to make with the board in
+  // hand and the stream on screen, not blind.
   if(config.pixel_format == PIXFORMAT_JPEG){
     s->set_framesize(s, FRAMESIZE_QVGA);
   }
 
-  WiFi.begin(ssid, password);
-  WiFi.setSleep(false);
-
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
+  if (!connectWiFi(WIFI_CONNECT_TIMEOUT_MS)) {
+    Serial.println("WiFi did not come up; rebooting to retry");
+    wifiRestartCount++;
+    ESP.restart();
   }
   Serial.println("");
   Serial.println("WiFi connected");
+  lastConnectedMs = millis();
 
   char hostname[24];
   snprintf(hostname, sizeof(hostname), "traincam-%06llx",
@@ -118,6 +176,21 @@ void setup() {
 }
 
 void loop() {
-  // Do nothing. Everything is done in another task by the web server
-  delay(10000);
+  esp_task_wdt_reset();
+
+  if (WiFi.status() == WL_CONNECTED) {
+    lastConnectedMs = millis();
+  } else if (millis() - lastConnectedMs > WIFI_GRACE_MS) {
+    // ponytail: reboot rather than reconnect in place. mDNS does not reliably
+    // re-advertise after a reconnect, and httpd is left holding sockets for
+    // clients that are already gone, so a live reconnect tends to come back
+    // unreachable by name. A reboot is about a second and returns the whole
+    // board to a known state. Upgrade to in-place recovery only if that second
+    // of downtime ever turns out to matter.
+    Serial.println("WiFi down past the grace period; rebooting");
+    wifiRestartCount++;
+    ESP.restart();
+  }
+
+  delay(1000);
 }
