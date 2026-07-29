@@ -314,6 +314,16 @@
     line: "dtoverlay={{ traincam_camera_overlay }}"
     state: "{{ 'present' if traincam_camera_overlay | length > 0 else 'absent' }}"
 
+# An explicit overlay and the auto-probe must not both run: auto_detect appends
+# its own dtoverlay for whatever it finds, so leaving it on either double-loads
+# the sensor or silently wins. Arducam's own procedure sets it to 0. Flipping it
+# back to 1 when the overlay is cleared is what makes the rollback a one-liner.
+- name: Match camera_auto_detect to the overlay choice
+  ansible.builtin.lineinfile:
+    path: /boot/firmware/config.txt
+    regexp: '^camera_auto_detect='
+    line: "camera_auto_detect={{ 0 if traincam_camera_overlay | length > 0 else 1 }}"
+
 - name: Disable unused headless hardware
   ansible.builtin.lineinfile:
     path: /boot/firmware/config.txt

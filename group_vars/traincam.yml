@@ -24,13 +24,24 @@ traincam_height: 720
 #   ls /boot/firmware/overlays/ | grep -E 'imx|ov[0-9]'
 # The deploy asserts the .dtbo exists, so a typo fails the run, not the camera.
 # Requires a reboot to take effect.
-traincam_camera_overlay: ""
+# Set Jul 29 after fitting an "OMP camera v2.3" (IMX219). It had previously
+# "not been detected" - that was never a hardware fault. camera_auto_detect
+# failed to probe it, which is indistinguishable from a dead ribbon cable.
+# Named here it comes up first try: rpicam-vid --list-cameras reports
+# imx219 [3280x2464] with a 1640x1232 full-FOV binned mode, so 1280x720 is
+# 1.28x downsampled instead of the ov5647's ~1:1. Reverting to "" plus the
+# ov5647 tuning below is the whole rollback.
+traincam_camera_overlay: "imx219"
 traincam_fps: 24
 traincam_awb: auto
-# libcamera tuning. The NoIR camera modules have no IR-cut filter, so the stock
-# ov5647.json renders everything magenta (measured: U 143 / V 148 against a
-# neutral 128).
-traincam_tuning_source: /usr/share/libcamera/ipa/rpi/vc4/ov5647_noir.json
+# libcamera tuning. Must match the fitted module - this is where colour comes
+# from. The old ov5647 was a NoIR (no IR-cut filter) and needed ov5647_noir.json
+# or everything came out magenta. The IMX219 now fitted IS IR-filtered, proved
+# by shooting the same scene through both: imx219.json renders neutral walls
+# and correct skin tone, imx219_noir.json over-corrects to a green/cyan cast.
+# If a module is ever swapped, shoot both and pick - it takes two minutes and
+# guessing gets the colour wrong in a way that looks like a camera fault.
+traincam_tuning_source: /usr/share/libcamera/ipa/rpi/vc4/imx219.json
 traincam_tuning_file: /etc/traincam/tuning.json
 # AGC shutter/gain ladder, walked in order as the scene darkens. The stock
 # ladder reaches 30000us before it raises gain past 4, which parks a moving
@@ -47,7 +58,16 @@ traincam_agc_gain: [1.0, 2.0, 4.0, 6.0, 8.0, 8.0]
 # good (see docs/NETWORK.md), and the Zero 2 W is 2.4GHz-only, so a busy hall
 # leaves no room to escape. Raise it if the picture is too soft and the radio
 # proves stable; the trade is reliability, not just airtime.
-traincam_extra_opts: "--denoise cdn_off --saturation 1.1 --bitrate 2500000"
+# --mode pins the sensor mode. Without it libcamera matches our 16:9 output and
+# picks the imx219's 1920x1080 mode, which is an unbinned CROP - measured at
+# left 688, top 700 of the 3280x2464 array, so 58% of the sensor width. That
+# cost the whole left wall and the doorway in a side-by-side. 1640x1232 is the
+# full-FOV 2x2-binned mode: the entire lens view, and 4x the photons per output
+# pixel. The light matters as much as the framing - measured at 33-41 lux (a lit
+# room) the AGC was already pegged at its ceiling, 66502us and gain 5.95, and a
+# layout is darker than that. Still 1.28x supersampled into 720p. Costs a little
+# sharpness against the crop; drop this flag to trade the room back for it.
+traincam_extra_opts: "--denoise cdn_off --saturation 1.1 --bitrate 2500000 --mode 1640:1232"
 
 # Optional tuning (uncomment to override):
 # traincam_keyframe_interval: 48      # Defaults based on LATENCY_MODE
