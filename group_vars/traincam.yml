@@ -7,6 +7,24 @@
 # ─────────────────────────────────────────────────────────────
 traincam_width: 1280
 traincam_height: 720
+
+# Which camera sensor overlay to load. Empty = rely on camera_auto_detect,
+# which is correct for the official Raspberry Pi modules and ONLY those:
+# ov5647 (Camera v1, what is fitted now), imx219 (v2), imx477 (HQ), imx708 (v3).
+#
+# Arducam's own boards are not in that probe list and will look completely
+# undetected - identical symptoms to a dead ribbon - until named here:
+#   imx519    Arducam 16MP autofocus (B0371 etc)
+#   ov64a40   Arducam 64MP Hawkeye
+#   imx462    Arducam low-light  (also imx290/imx327/imx335/imx415)
+#   imx296    global shutter
+#   imx477    Arducam HQ variants
+#   imx708    Arducam Camera-3 variants
+# Confirm what this Pi actually has before setting it:
+#   ls /boot/firmware/overlays/ | grep -E 'imx|ov[0-9]'
+# The deploy asserts the .dtbo exists, so a typo fails the run, not the camera.
+# Requires a reboot to take effect.
+traincam_camera_overlay: ""
 traincam_fps: 24
 traincam_awb: auto
 # libcamera tuning. The NoIR camera modules have no IR-cut filter, so the stock

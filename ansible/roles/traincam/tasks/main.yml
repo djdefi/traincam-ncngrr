@@ -284,6 +284,36 @@
     - wayvnc.service
   when: item in ansible_facts.services
 
+- name: Verify the requested camera overlay actually exists
+  ansible.builtin.stat:
+    path: "/boot/firmware/overlays/{{ traincam_camera_overlay }}.dtbo"
+  register: traincam_cam_overlay
+  when: traincam_camera_overlay | length > 0
+
+# Fail the deploy rather than the camera. A typo'd overlay otherwise costs a
+# reboot to discover, and the failure looks identical to a dead ribbon cable.
+- name: Fail early if that camera overlay is not available
+  ansible.builtin.assert:
+    that: traincam_cam_overlay.stat.exists
+    fail_msg: >-
+      No overlay /boot/firmware/overlays/{{ traincam_camera_overlay }}.dtbo.
+      List what this Pi has with:
+      ls /boot/firmware/overlays/ | grep -E 'imx|ov[0-9]'
+  when: traincam_camera_overlay | length > 0
+
+# camera_auto_detect only probes the official Raspberry Pi sensors (ov5647,
+# imx219, imx477, imx708). Arducam's own modules - imx519 16MP, ov64a40 64MP,
+# the imx462/imx327 low-light Pivariety boards - are NOT in that list and stay
+# invisible until named here, which looks exactly like a dead cable. The
+# overlays README confirms it: "Load: dtoverlay=imx519,<param>=<val>".
+# Empty = leave auto-detect alone. Requires a reboot to take effect.
+- name: Select the camera sensor overlay
+  ansible.builtin.lineinfile:
+    path: /boot/firmware/config.txt
+    regexp: '^dtoverlay=(imx|ov)[0-9][^,[:space:]]*'
+    line: "dtoverlay={{ traincam_camera_overlay }}"
+    state: "{{ 'present' if traincam_camera_overlay | length > 0 else 'absent' }}"
+
 - name: Disable unused headless hardware
   ansible.builtin.lineinfile:
     path: /boot/firmware/config.txt
