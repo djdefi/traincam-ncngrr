@@ -173,10 +173,18 @@ matrix but it cannot undo the two physical costs, and no config setting will:
 NoIR modules exist for night vision with an IR illuminator. For a lit layout an
 IR-filtered module is the correct part, and swapping is the only real fix.
 
-**How bad it is depends entirely on the lighting**, so measure at the venue
-before buying anything. Incandescent, halogen and daylight are IR-rich and will
-show all of the above. Modern LED and fluorescent emit almost no IR, so under a
-typical LED-lit hall a NoIR module with the `_noir` tuning can be close to fine.
+**How bad it is depends entirely on the lighting.** Incandescent and halogen are
+blackbody radiators: a ~2800K filament emits more power in near-IR than in
+visible, and halogen floods more still. They are the worst case. Fluorescent is
+a line spectrum and modern LED emits almost no IR, so under those a NoIR module
+with the `_noir` tuning can be close to fine.
+
+**The Aug 2026 venue is mostly incandescent/halogen flood.** So this is the bad
+case, and no software setting fixes it: Bayer dyes are largely transparent above
+~700nm, which means IR lands in R, G and B at similar strength. That is a
+common-mode pedestal, and per-channel gains are multiplicative — you cannot
+subtract a common term by multiplying. This is exactly why IR-cut filters exist
+in hardware instead of in software.
 
 **Telling them apart, no tools:** point a TV remote at the lens and hold a
 button. On the stream, a NoIR module shows the remote's LED as an obvious bright
@@ -184,29 +192,73 @@ white/violet dot. An IR-filtered module shows nothing at all.
 
 **Telling them apart by measurement**, which is the reliable way — the eye gets
 this backwards, because a correct rendering looks green immediately after a
-magenta one, and any coloured room lighting defeats judgement entirely. Shoot
-the same scene through both tuning files back to back, then sample a genuinely
-neutral surface (white trim, a sheet of paper) and take the channel ratios:
+magenta one, and any coloured room lighting defeats judgement entirely.
+
+> **Measure in the video path. Never `rpicam-jpeg`.**
+> The still and video pipelines converge on different white balance. Byte-
+> identical options on one scene measured 1.046/1.032 through `rpicam-jpeg` and
+> 0.785/0.809 through `rpicam-vid`. An earlier version of this page recommended
+> `rpicam-jpeg` here, and following it produced a confident, wrong conclusion
+> about which tuning file this module needs. Use `--codec mjpeg`:
 
 ```bash
+sudo systemctl stop traincam
 for t in imx219 imx219_noir; do
-  rpicam-jpeg -n -t 3000 -o /tmp/$t.jpg --width 1280 --height 720 \
+  rpicam-vid --nopreview -t 3000 --codec mjpeg --width 1280 --height 720 \
+    --mode 1640:1232 --segment 1 -o /tmp/$t-%03d.jpg \
     --tuning-file /usr/share/libcamera/ipa/rpi/vc4/$t.json
 done
+sudo systemctl start traincam
 ```
 
-```python
-from PIL import Image; import numpy as np
-m = np.asarray(Image.open("/tmp/imx219.jpg").convert("RGB")).astype(float)
-m = m[Y0:Y1, X0:X1].reshape(-1, 3).mean(0)   # a white/neutral patch
-print(m[0] / m[1], m[2] / m[1])              # neutral is 1.0, 1.0
-```
+Sample a genuinely neutral surface (white trim, a sheet of paper) and take the
+channel ratios. Neutral is `R/G = B/G = 1.0`; above 1 is magenta, below is
+green. Measured here in the video path: `imx219.json` gave 1.610/1.356,
+`imx219_noir.json` gave 0.791/0.838.
 
-Neutral is `R/G = B/G = 1.0`; above 1 is magenta, below is green. Measured here
-on white door trim: `imx219.json` gave 1.521/1.437, `imx219_noir.json` gave
-1.019/0.969. Anything near 1.5 on a white surface is the wrong file. Note that
-R and B being elevated *together* is the IR signature — coloured room lighting
+**R and B elevated *together* is the IR signature** — coloured room lighting
 would push one channel much harder than the other.
+
+## White balance must be recalibrated at the venue
+
+`imx219_noir.json` ships `rpi.awb = {"bayes": 0}`. Bayesian AWB is switched off
+outright: there is no `ct_curve`, no `priors`, and no `modes` dict. Three
+consequences, all confirmed by measurement:
+
+- **`--awb` is a no-op** under this tuning. All seven modes measure identically,
+  because the modes dict it would select from does not exist.
+- libcamera falls back to **grey-world** AWB, which depends purely on scene
+  statistics. That is why the still and video paths disagree: different sensor
+  mode and downscale, different statistics.
+- So `traincam_awb_gains` is not a workaround — it is the only white balance
+  control that exists here.
+
+The colour matrices are fine, though: the `_noir` file carries 8 CCMs spanning
+2498–8575K, reaching further into tungsten than `imx219.json`'s 2860K. libcamera
+back-derives colour temperature from manual gains (locked gains of `0.99,2.23`
+reported `ColourTemperature: 2706`) and picks the right matrix, so no CCM
+override is needed.
+
+Because the lock is a fixed number, **it is only correct for the light it was
+measured under**. Evidence it does not travel: with gains unchanged, one room
+measured 0.985/1.094 in the evening and 1.152/1.114 the next morning.
+
+Use the helper rather than doing this by hand:
+
+```bash
+./scripts/calibrate_awb.py measure   # white paper FILLING the frame, venue lighting
+# paste the printed traincam_awb_gains into group_vars/traincam.yml
+ansible-playbook -i inventory traincam.yml
+./scripts/calibrate_awb.py verify    # normal scene; wants R/G and B/G near 1.00
+```
+
+The card must fill the frame because grey-world assumes the frame averages to
+grey. Both commands stop the stream and restart it on exit, including on
+failure.
+
+**If there is no time to calibrate at the venue, clear `traincam_awb_gains`
+rather than shipping a lock from another room.** Grey-world auto is at least
+self-correcting; a wrong fixed lock is not.
 
 ## Swapping the camera module
 
