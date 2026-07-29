@@ -27,6 +27,29 @@ def find_agc(doc):
     return doc.get("rpi.agc")
 
 
+def agc_ladders(doc):
+    """Every dict inside rpi.agc that carries an exposure_modes ladder.
+
+    Two schemas are in the wild. ov5647*.json puts exposure_modes directly in
+    rpi.agc; every current sensor (imx219, imx477, imx708) nests one copy per
+    HDR exposure channel under rpi.agc.channels[]. Only the first shape was
+    handled, so fitting an imx219 silently shipped its stock ladder - which
+    reaches 30000us at gain 4 and smears exactly the motion this ladder exists
+    to stop. Every channel is patched: the prefer-gain-over-shutter policy is
+    about the camera moving, which is true of all of them.
+    """
+    agc = find_agc(doc)
+    if not isinstance(agc, dict):
+        return []
+    if "exposure_modes" in agc:
+        return [agc]
+    channels = agc.get("channels")
+    if isinstance(channels, list):
+        return [c for c in channels
+                if isinstance(c, dict) and "exposure_modes" in c]
+    return []
+
+
 def main(argv):
     if len(argv) not in (3, 5):
         sys.stderr.write(__doc__)
@@ -45,13 +68,14 @@ def main(argv):
         if sorted(shutter) != shutter or sorted(gain) != gain:
             sys.stderr.write("shutter and gain ladders must be non-decreasing\n")
             return 2
-        agc = find_agc(doc)
         # A colour or exposure problem must not take the camera offline, so an
         # unrecognised tuning file is copied through rather than rejected.
-        if agc is None or "exposure_modes" not in agc:
-            sys.stderr.write("WARNING: no rpi.agc exposure_modes in %s, copying verbatim\n" % src)
-        else:
-            agc["exposure_modes"]["normal"] = {"shutter": shutter, "gain": gain}
+        ladders = agc_ladders(doc)
+        if not ladders:
+            sys.stderr.write(
+                "WARNING: no rpi.agc exposure_modes in %s, copying verbatim\n" % src)
+        for holder in ladders:
+            holder["exposure_modes"]["normal"] = {"shutter": shutter, "gain": gain}
 
     new = json.dumps(doc, indent=2, sort_keys=True)
     old = None

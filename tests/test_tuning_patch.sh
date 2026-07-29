@@ -72,6 +72,39 @@ python3 "$PATCHER" "$TEMP_DIR/src.json" "$TEMP_DIR/bad.json" '[20000, 100]' '[1.
 test_case "Decreasing shutter ladder rejected" "2" "$?"
 
 # An unrecognised tuning file must still yield a usable file, not an error.
+# The channels[] schema: every current sensor (imx219, imx477, imx708) nests
+# exposure_modes one level down, one per HDR channel. Fitting an imx219 with
+# only the flat schema supported silently shipped its stock 30000us ladder.
+cat > "$TEMP_DIR/channels.json" <<'EOF'
+{"version": 2.0, "algorithms": [
+  {"rpi.agc": {"channels": [
+    {"base_ev": 1.0, "exposure_modes": {
+      "normal": {"shutter": [100, 30000], "gain": [1.0, 4.0]},
+      "short":  {"shutter": [100, 10000], "gain": [1.0, 4.0]}}},
+    {"base_ev": 0.5, "exposure_modes": {
+      "normal": {"shutter": [100, 60000], "gain": [1.0, 8.0]}}}]}}]}
+EOF
+
+out=$(python3 "$PATCHER" "$TEMP_DIR/channels.json" "$TEMP_DIR/ch_out.json" "$SHUTTER" "$GAIN" 2>&1)
+test_case "channels[] schema reports changed, no warning" "changed" "$out"
+
+read -r ch0 ch1 ch0_short ch1_ev <<< "$(python3 - "$TEMP_DIR/ch_out.json" <<'PY'
+import json, sys
+d = json.load(open(sys.argv[1]))
+ch = next(a["rpi.agc"] for a in d["algorithms"] if "rpi.agc" in a)["channels"]
+j = lambda v: json.dumps(v).replace(" ", "")
+print(j(ch[0]["exposure_modes"]["normal"]["shutter"]),
+      j(ch[1]["exposure_modes"]["normal"]["shutter"]),
+      j(ch[0]["exposure_modes"]["short"]["shutter"]),
+      ch[1]["base_ev"])
+PY
+)"
+
+test_case "channels[0] ladder replaced"        "[100,2500,20000]" "$ch0"
+test_case "channels[1] ladder replaced"        "[100,2500,20000]" "$ch1"
+test_case "channels[] other modes preserved"   "[100,10000]"      "$ch0_short"
+test_case "channels[] sibling keys preserved"  "0.5"              "$ch1_ev"
+
 echo '{"version": 2.0, "algorithms": [{"rpi.awb": {"bayes": 1}}]}' > "$TEMP_DIR/noagc.json"
 python3 "$PATCHER" "$TEMP_DIR/noagc.json" "$TEMP_DIR/noagc_out.json" "$SHUTTER" "$GAIN" >/dev/null 2>&1
 test_case "Missing rpi.agc still succeeds" "0" "$?"
