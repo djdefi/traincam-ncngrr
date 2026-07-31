@@ -81,9 +81,23 @@ The onboard camera runs on power harvested from the DCC track. This document des
 - Pass-through charging keeps it topped up while power is available
 - Pi continues running briefly during power gaps
 
+> **Not every bank does this, and it is the hardest spec to satisfy.**
+> "Pass-through charging" on the box usually means only that the bank *can*
+> charge and output at the same time. It does not promise the output stays up
+> when the input goes away. Many banks drop the rail for tens of milliseconds
+> while they switch from charge mode to discharge mode, which brown-outs the Pi
+> — a Zero has very little bulk capacitance to ride it out. A bank can run the
+> Pi happily for hours on its cells and still fail this. Measured 2026-07-31:
+> the bank fitted at the time rebooted the Pi four times out of four when its
+> input was pulled, two of those hard enough to crash during early boot, and
+> `vcgencmd get_throttled` never once reported undervoltage first. What you want
+> is sometimes sold as "UPS mode" or "uninterruptible"; it is rarely stated, so
+> step 2 of *Before Installing in a Car* is the arbiter, not the marketing.
+
 **Specs:**
 - Small form factor (fits in train car)
 - Pass-through charging support
+- **Uninterruptible output when input is removed** (test it; see above)
 - 5V 2A+ output capability
 - 2000-5000mAh capacity (balance size vs runtime)
 
@@ -131,7 +145,7 @@ The onboard camera runs on power harvested from the DCC track. This document des
 ## Before Installing in a Car
 
 1. Set the buck converter to 5.1V before connecting a camera, then confirm it stays stable under camera load.
-2. Verify the battery bank supports simultaneous charge and output without resetting when track power is removed and restored.
+2. Verify the battery bank supports simultaneous charge and output without resetting when track power is removed and restored. Watch `/proc/sys/kernel/random/boot_id` across the gap, not uptime and not the LEDs — if that value changes, the Pi rebooted and the bank does not buffer. Test escalating gaps (a ~0.5s tap, 2s, 10s, 30s); the short ones matter most, because a switch gap is far shorter than a dead section. Note that undervoltage gives no warning: `get_throttled` stayed `0x0` right up to the moment of death in every failure observed so far.
 3. Run the complete camera for 30 minutes and confirm `vcgencmd get_throttled` reports `0x0`.
 4. Insulate every exposed conductor, add strain relief, and keep the converter and camera ventilated.
 5. Repeat the test from wheel pickups on the layout before securing the car body.

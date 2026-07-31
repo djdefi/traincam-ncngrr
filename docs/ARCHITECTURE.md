@@ -167,7 +167,7 @@ traincam-ncngrr/
 
 3. **rpicam-vid + ffmpeg pipeline** — Pi's native camera tool pipes H.264 directly to ffmpeg, which sends it to MediaMTX via RTSP. No re-encoding.
 
-4. **Battery-backed power** — USB battery bank buffers the DCC track power, keeping the Pi running through dirty track and switch gaps.
+4. **Battery-backed power** — A USB battery bank sits between the track pickups and the Pi so the camera can ride out dirty track and switch gaps. This only works with a bank that has *true uninterruptible* pass-through: many banks glitch their output while switching between charging and discharging, which reboots the Pi on every gap. Measured on 2026-07-31: the bank fitted at the time dropped the Pi in under a second when its input was removed, despite running fine for 104 minutes on its cells alone. Test the specific bank before trusting it — see `docs/HARDWARE.md`.
 
 5. **mDNS for discovery** — Devices find each other by name (`traincam1.local`) rather than IP addresses.
 
