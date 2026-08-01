@@ -58,7 +58,7 @@ traincameranet (WiFi AP)
        │         ├── WHEP: http://traincam1.local:8889/traincam/whep
        │         └── Viewer: http://traincam1.local:8080/viewer.html
        │
-       └─── display.local (Pi 5 - receiver)
+       └─── trainview1.local (Pi 5 - receiver)
                  │
                  └── Chromium → http://traincam1.local:8080/viewer.html
 ```

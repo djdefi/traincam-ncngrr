@@ -198,6 +198,25 @@
     state: absent
   notify: Restart viewer
 
+# Measured at the layout 2026-08-01: with IPv6 enabled, avahi churned through
+# temporary link-local addresses (register/withdraw every ~1s, same addresses
+# recycling). That churn made avahi see its own announcements as a competing
+# claim, so it renamed itself traincam1 -> traincam1-2 -> traincam1-3, and the
+# surviving record pointed at 127.0.0.1. Net effect: traincam1.local did not
+# resolve at all, and stale names lingered as phantom cameras.
+# Every URL in this project uses traincam1.local, so this is load-bearing.
+# We publish over IPv4 only; nothing here needs IPv6.
+- name: Disable IPv6 in avahi to stop link-local address churn
+  ansible.builtin.lineinfile:
+    path: /etc/avahi/avahi-daemon.conf
+    regexp: '^#*\s*use-ipv6\s*='
+    line: 'use-ipv6=no'
+    insertafter: '^\[server\]'
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Restart Avahi
+
 - name: Advertise TrainCam via mDNS
   ansible.builtin.template:
     src: traincam-avahi.service.j2
