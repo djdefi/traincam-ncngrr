@@ -11,7 +11,7 @@ All TrainCam devices connect to a dedicated WiFi network:
 | SSID | _(your network name)_ |
 | Password | _(your password)_ |
 
-**Note:** The ESP32 firmware has placeholder credentials in `CameraWebServer/CameraWebServer.ino` — edit before uploading. Configure the Pi network with Raspberry Pi Imager or NetworkManager.
+**Note:** ESP32 WiFi credentials go in `CameraWebServer/secrets.h`, which is gitignored — copy `secrets.h.example` to `secrets.h` and fill it in before uploading. The build fails with a clear error if it's missing. Configure the Pi network with Raspberry Pi Imager or NetworkManager.
 
 ## Required Ports
 

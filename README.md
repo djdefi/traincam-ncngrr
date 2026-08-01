@@ -42,8 +42,8 @@ open http://traincam1.local:8080/viewer.html
 
 ### ESP32 (Arduino)
 
-1. Open `CameraWebServer/CameraWebServer.ino` in Arduino IDE
-2. Set your WiFi credentials (lines 12-13)
+1. `cp CameraWebServer/secrets.h.example CameraWebServer/secrets.h` and set your WiFi credentials in it (it's gitignored — this repo is public)
+2. Open `CameraWebServer/CameraWebServer.ino` in Arduino IDE
 3. Upload to XIAO ESP32S3 Sense
 4. Open the `http://traincam-xxxxxx.local/stream` URL printed over Serial
 

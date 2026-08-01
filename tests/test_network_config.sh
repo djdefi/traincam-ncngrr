@@ -61,9 +61,29 @@ echo "--- WiFi Configuration ---"
 # Check ESP32 firmware for WiFi settings
 ESP32_INO="CameraWebServer/CameraWebServer.ino"
 if [[ -f "$ESP32_INO" ]]; then
-  SSID=$(grep 'ssid = ' "$ESP32_INO" | grep -o '"[^"]*"' | tr -d '"' | head -1 || echo "")
-  test_case "ESP32 SSID is 'traincameranet'" "traincameranet" "$SSID"
-  
+  # Credentials must NOT be hardcoded here. This repo is public, and the old
+  # plaintext WiFi password is still in git history because it was (806f855).
+  # This assertion used to require the SSID be hardcoded, which enforced the
+  # leak rather than catching it.
+  if grep -qE '(ssid|password) *= *"' "$ESP32_INO"; then
+    test_case "ESP32 credentials not hardcoded" "clean" "hardcoded credential found"
+  else
+    test_case "ESP32 credentials not hardcoded" "clean" "clean"
+  fi
+
+  if grep -q '#include "secrets.h"' "$ESP32_INO"; then
+    test_case "ESP32 reads credentials from secrets.h" "found" "found"
+  else
+    test_case "ESP32 reads credentials from secrets.h" "found" "missing"
+  fi
+
+  # The gitignore entry is the actual protection; without it secrets.h gets
+  # committed silently the next time someone runs `git add -A`.
+  if grep -q '^CameraWebServer/secrets.h$' .gitignore 2>/dev/null; then
+    test_case "secrets.h is gitignored" "found" "found"
+  else
+    test_case "secrets.h is gitignored" "found" "missing"
+  fi
   # Check WiFi.setSleep(false) for reliable streaming
   if grep -q 'WiFi.setSleep(false)' "$ESP32_INO"; then
     test_case "ESP32 WiFi sleep disabled" "found" "found"

@@ -11,9 +11,13 @@
 // ===========================
 // WiFi Configuration
 // ===========================
-// Default network for TrainCam. Change if using your own network.
-const char* ssid = "traincameranet";
-const char* password = "locomotive";  // Default password - change for production
+// Credentials live in secrets.h, which is gitignored. Copy secrets.h.example
+// to secrets.h and fill it in. This repo is PUBLIC, and the password that used
+// to sit here in plain text is still in git history as a result.
+#include "secrets.h"
+
+const char* ssid = TRAINCAM_WIFI_SSID;
+const char* password = TRAINCAM_WIFI_PASSWORD;
 
 // At a fair everything is switched on at once, so the access point is often not
 // up yet when this board boots. Give it a bounded wait, then reboot and try
