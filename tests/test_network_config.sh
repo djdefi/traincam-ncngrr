@@ -122,8 +122,12 @@ else
   skip_case "Inventory mDNS check" "file not found"
 fi
 
-# Check if viewer.html uses .local hostnames
-VIEWER="client/viewer.html"
+# Check the viewer that actually gets DEPLOYED.
+# This deliberately points at the Ansible template, not a hand copy. A previous
+# version of this test checked client/viewer.html, which stayed green while the
+# deployed template had no whepBase support at all - so the kiosk would have
+# looked for the camera on its own localhost and never connected.
+VIEWER="ansible/roles/traincam/templates/viewer.html.j2"
 if [[ -f "$VIEWER" ]]; then
   # The viewer uses location.hostname by default, with optional overrides
   if grep -q "whepBase" "$VIEWER"; then

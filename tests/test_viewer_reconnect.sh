@@ -195,7 +195,7 @@ vm.runInThisContext(fs.readFileSync(process.argv[2], 'utf8'));
   assert.strictEqual(delays[0], 1125,
     'retry delay must be jittered by +/-25% of 1500, got ' + delays[0]);
   process.stdout.write('✓ retry delay is jittered\n');
-})().catch(err => { process.stdout.write('✗ ' + err.message + '\n'); process.exit(1); });
+})().then(() => process.exit(0)).catch(err => { process.stdout.write('✗ ' + err.message + '\n'); process.exit(1); });
 HARNESS
 
 if node "$TEMP_DIR/harness.js" "$TEMP_DIR/viewer.js"; then

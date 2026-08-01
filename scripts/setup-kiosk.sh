@@ -3,7 +3,7 @@
 #
 # WHY NOT JUST POINT CHROMIUM AT THE CAMERA (what docs/RECEIVER.md describes):
 # because viewer.html is SERVED BY the camera Pi. Once the page is loaded it
-# reconnects fine on its own (client/viewer.html backs off and retries), so a
+# reconnects fine on its own (the viewer backs off and retries), so a
 # camera that disappears mid-show recovers without help. But if the camera is
 # down at the moment Chromium loads the page, Chromium shows a network error
 # page and NEVER retries - there is no reload logic on an error page.
@@ -54,7 +54,7 @@ elif [[ -f "$WWW/viewer.html" ]]; then
 else
   rm -f "$WWW/viewer.html.new"
   echo "ERROR: camera unreachable and no local copy exists." >&2
-  echo "       Bring the camera up once, or copy client/viewer.html to $WWW/" >&2
+  echo "       Bring the camera up once so a copy can be cached." >&2
   exit 1
 fi
 

@@ -36,7 +36,21 @@
 <script>
 const PATH = 'traincam';
 // Derive MediaMTX base (viewer served on 8080; mediamtx on 8889 by default)
-const MTX_BASE = (() => { try { const u = new URL(window.location.href); u.port='{{ traincam_webrtc_port | default(8889) }}'; return u.origin; } catch(_) { return window.location.origin; } })();
+// Where to reach MediaMTX. Normally this page is served BY the camera, so the
+// port swap below is right. But scripts/setup-kiosk.sh deliberately serves a
+// cached copy from the kiosk's OWN localhost, so that a camera which is off,
+// on a battery swap, or out of range leaves a retrying page rather than a
+// Chromium error page that never retries. In that setup window.location points
+// at the kiosk, not the camera, so an explicit ?whepBase= has to win.
+const MTX_BASE = (() => {
+  const qs = new URLSearchParams(window.location.search);
+  const explicit = qs.get('whepBase');
+  if (explicit) { try { return new URL(explicit).origin; } catch(_) {} }
+  const port = qs.get('whepPort') || '{{ traincam_webrtc_port | default(8889) }}';
+  const host = qs.get('whepHost');
+  try { const u = new URL(window.location.href); if (host) u.hostname = host; u.port = port; return u.origin; }
+  catch(_) { return window.location.origin; }
+})();
 const AUTOREC_DELAY_MS = 1500;
 const AUTOREC_MAX_MS = 15000;
 let retryDelay = AUTOREC_DELAY_MS;
@@ -87,7 +101,7 @@ async function connect(){
   conn.addEventListener('connectionstatechange', () => {
     if (pc !== conn) return;
     if (['disconnected','failed','closed'].includes(conn.connectionState)) fail('State: ' + conn.connectionState);
-    else { if (conn.connectionState === 'connected') retryDelay = AUTOREC_DELAY_MS; log('State: ' + conn.connectionState); }
+    else { if (conn.connectionState === 'connected') { retryDelay = AUTOREC_DELAY_MS; lastMediaAt = Date.now(); lastMediaTime = -1; } log('State: ' + conn.connectionState); }
   });
   conn.addTransceiver('video',{direction:'recvonly'});
   try {
@@ -108,7 +122,26 @@ async function connect(){
   connectBtn.disabled = true; disconnectBtn.disabled = false; showUI();
 }
 
-function cleanup(){ releaseResource(); if (abortController) abortController.abort(); if (pc){ try{ pc.close(); }catch(_){} } pc=null; connectBtn.disabled=false; disconnectBtn.disabled=true; showUI(); }
+function cleanup(){ releaseResource(); if (abortController) abortController.abort(); if (pc){ try{ pc.close(); }catch(_){} } pc=null; lastMediaAt=0;
+  // Drop the last frame. Leaving it on screen at a show reads as a train that
+  // has stopped, not a camera that has gone away, and nobody comes to look.
+  try { videoEl.srcObject = null; } catch(_){}
+  connectBtn.disabled=false; disconnectBtn.disabled=true; showUI(); }
+
+// A WebRTC session can sit in connectionState "connected" while media has
+// stopped arriving, so connectionstatechange never fires and the kiosk shows a
+// frozen frame indefinitely. That is not hypothetical here: wlan0 was measured
+// dropping the association for 77s at the layout on 2026-08-01
+// (NetworkManager reason 'ssid-not-found'). Watch the video clock, which only
+// advances when frames actually land, rather than trusting the peer state.
+const STALL_MS = 8000;
+let lastMediaTime = -1, lastMediaAt = 0;
+setInterval(() => {
+  if (!pc || pc.connectionState !== 'connected' || !lastMediaAt) return;
+  const t = videoEl.currentTime, now = Date.now();
+  if (t !== lastMediaTime) { lastMediaTime = t; lastMediaAt = now; return; }
+  if (now - lastMediaAt > STALL_MS) { log('Stalled - reconnecting'); cleanup(); if (autorec.checked) scheduleReconnect(); }
+}, 2000);
 // ponytail: jittered exponential backoff, not a fixed retry. Measured Jul 28:
 // ONE tab opened 143 WHEP sessions in 5 minutes, creations 1.57-1.63s apart
 // (= AUTOREC_DELAY_MS + round trip), all from a single source port, while the
