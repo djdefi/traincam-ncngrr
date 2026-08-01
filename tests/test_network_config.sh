@@ -144,6 +144,36 @@ else
   skip_case "Viewer hostname check" "file not found"
 fi
 
+KIOSK_SETUP="scripts/setup-kiosk.sh"
+if grep -q 'ExecStartPre=.*wlr-randr' "$KIOSK_SETUP" &&
+   grep -q 'traincam-kiosk.desktop' "$KIOSK_SETUP" &&
+   grep -q 'After=.*xdg-desktop-portal.service' "$KIOSK_SETUP"; then
+  test_case "Kiosk starts from the graphical session" "found" "found"
+else
+  test_case "Kiosk starts from the graphical session" "found" "missing"
+fi
+
+# Both HDMI panels must show the stream. setup-kiosk.sh writes a kanshi mirror
+# that overlaps both outputs at the same 0,0 origin; if that line is lost the
+# second panel goes dark, which is exactly the failure this asserts against.
+if grep -q 'KANSHI_CFG' "$KIOSK_SETUP" &&
+   grep -Eq 'output HDMI-A-2 .*position 0,0' "$KIOSK_SETUP"; then
+  test_case "Kiosk mirrors both HDMI outputs" "found" "found"
+else
+  test_case "Kiosk mirrors both HDMI outputs" "found" "missing"
+fi
+
+# Slow boot was SD-card IO starvation from services the appliance does not need.
+# The optimizer must mask e2scrub_reap (the 69s hog) and stay reversible.
+BOOT_OPT="scripts/optimize-boot.sh"
+if grep -q 'e2scrub_reap.service' "$BOOT_OPT" 2>/dev/null &&
+   grep -q 'systemctl mask' "$BOOT_OPT" 2>/dev/null &&
+   grep -q -- '--uninstall' "$BOOT_OPT" 2>/dev/null; then
+  test_case "Boot optimizer masks e2scrub_reap and is reversible" "found" "found"
+else
+  test_case "Boot optimizer masks e2scrub_reap and is reversible" "found" "missing"
+fi
+
 echo ""
 echo "--- Service Dependencies ---"
 

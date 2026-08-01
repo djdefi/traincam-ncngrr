@@ -10,6 +10,13 @@ the venue's own lighting, run this, paste the number it prints.
   ./scripts/calibrate_awb.py measure     # white card filling the frame
   ./scripts/calibrate_awb.py verify      # normal scene, after deploying
 
+measure is authoritative; verify is only a rough smoke test. On a NORMAL scene
+verify samples the brightest pixels of the whole frame, which is exactly what
+grey-world optimises, so it structurally flatters --awb auto and penalises any
+fixed --awbgains lock - a good lock can read "BAD" next to a window or coloured
+scenery. Judge a lock with measure and a white card, not verify. (A wrong
+tuning file makes verify worse still: see the CAPTURE note below.)
+
 ponytail: runs over ssh from the laptop rather than deploying to the Pi. It is
 a bench tool, not a runtime component, so it stays out of the Ansible surface.
 """
@@ -23,11 +30,17 @@ import sys
 HOST = "train@traincam1.local"
 
 # Kept in step with publish.sh.j2 by test_calibrate_awb.sh, which fails if the
-# template's mode/size/framerate stop matching. Measuring in a different
-# pipeline to the one that streams is how the last calibration went wrong.
+# template's mode/size/framerate OR the tuning file stop matching. Measuring in
+# a different pipeline to the one that streams is how the last calibration went
+# wrong, and the tuning file is part of that pipeline: without --tuning-file,
+# libcamera auto-loads the stock imx219.json (Bayesian AWB) instead of the
+# deployed noir grey-world tuning, and the same scene then measured 1.56 vs 0.11
+# distance on 2026-08-01. TUNING is exactly what publish.sh loads.
+TUNING = "/etc/traincam/tuning.json"
 CAPTURE = (
     "rpicam-vid --nopreview -t 4000 --codec mjpeg "
-    "--width 1280 --height 720 --framerate 24 --mode 1640:1232"
+    "--width 1280 --height 720 --framerate 24 --mode 1640:1232 "
+    f"--tuning-file {TUNING}"
 )
 
 

@@ -26,11 +26,13 @@ WHEP_PORT="${WHEP_PORT:-8889}"
 LOCAL_PORT="${LOCAL_PORT:-8081}"
 WWW="$HOME/traincam-kiosk"
 UNIT_DIR="$HOME/.config/systemd/user"
+AUTOSTART_DIR="$HOME/.config/autostart"
 URL="http://localhost:${LOCAL_PORT}/viewer.html?whepBase=http://${CAMERA}:${WHEP_PORT}"
 
 if [[ "${1:-}" == "--uninstall" ]]; then
   systemctl --user disable --now traincam-kiosk.service traincam-kiosk-www.service 2>/dev/null || true
   rm -f "$UNIT_DIR"/traincam-kiosk.service "$UNIT_DIR"/traincam-kiosk-www.service
+  rm -f "$AUTOSTART_DIR"/traincam-kiosk.desktop
   systemctl --user daemon-reload 2>/dev/null || true
   echo "uninstalled. Screen blanking NOT re-enabled; use raspi-config if you want it back."
   exit 0
@@ -40,7 +42,7 @@ command -v chromium-browser >/dev/null 2>&1 || command -v chromium >/dev/null 2>
   echo "ERROR: no chromium found. apt install chromium-browser" >&2; exit 1; }
 CHROMIUM="$(command -v chromium-browser || command -v chromium)"
 
-mkdir -p "$WWW" "$UNIT_DIR"
+mkdir -p "$WWW" "$UNIT_DIR" "$AUTOSTART_DIR"
 
 # Fetch the page from the camera if we can, otherwise keep whatever is already
 # there. Deliberately NOT fatal: the whole point is to work when the camera is
@@ -79,23 +81,47 @@ EOF
 cat > "$UNIT_DIR/traincam-kiosk.service" <<EOF
 [Unit]
 Description=TrainCam kiosk browser
-After=graphical-session.target traincam-kiosk-www.service
-Wants=traincam-kiosk-www.service
+After=graphical-session.target traincam-kiosk-www.service xdg-desktop-portal.service
+Wants=traincam-kiosk-www.service xdg-desktop-portal.service
 [Service]
 Type=simple
+# default.target can start before LightDM has created the compositor socket.
+# Chromium stays alive but never opens the page, so Restart=always cannot help.
+# ponytail: Bookworm/Labwc uses wayland-0; wait for the real readiness signal.
+Environment=DISPLAY=:0
+Environment=WAYLAND_DISPLAY=wayland-0
+Environment=XDG_SESSION_TYPE=wayland
+Environment=XDG_RUNTIME_DIR=%t
+ExecStartPre=/usr/bin/timeout 90 /bin/sh -c 'until /usr/bin/wlr-randr >/dev/null 2>&1; do sleep 1; done'
 ExecStart=$CHROMIUM --kiosk --noerrdialogs --disable-infobars \\
   --disable-session-crashed-bubble --disable-features=Translate \\
+  --user-data-dir=$WWW/chromium-profile \\
   --no-first-run --autoplay-policy=no-user-gesture-required \\
   --check-for-update-interval=31536000 \\
   "$URL"
 Restart=always
 RestartSec=5
-[Install]
-WantedBy=default.target
+EOF
+
+# Starting the browser from default.target races LightDM: Chromium remains alive
+# but never opens the page. XDG autostart runs inside the graphical session,
+# after Labwc has created the display and D-Bus environment. It starts the
+# systemd service so Restart=always still handles later browser crashes.
+cat > "$AUTOSTART_DIR/traincam-kiosk.desktop" <<EOF
+[Desktop Entry]
+Type=Application
+Name=TrainCam kiosk
+Exec=systemctl --user restart traincam-kiosk.service
+Terminal=false
+X-GNOME-Autostart-enabled=true
 EOF
 
 systemctl --user daemon-reload
-systemctl --user enable --now traincam-kiosk-www.service traincam-kiosk.service
+systemctl --user enable traincam-kiosk-www.service
+systemctl --user disable traincam-kiosk.service 2>/dev/null || true
+# `enable --now` leaves an already-running service on its old unit contents.
+# Restart so re-running this idempotent installer actually applies its changes.
+systemctl --user restart traincam-kiosk-www.service traincam-kiosk.service
 
 # Screen blanking. raspi-config's helper is used rather than `xset s off`
 # (which docs/RECEIVER.md suggests) because Pi OS Bookworm defaults to Wayland,
@@ -116,6 +142,45 @@ else
   echo "         The kiosk still works - the screen will just blank when idle." >&2
   echo "         Run this yourself when you have the password:" >&2
   echo "           sudo raspi-config nonint do_blanking 1" >&2
+fi
+
+# Two-panel kiosk: BOTH HDMI outputs must show the stream. kanshi (shipped on
+# Pi OS Bookworm) mirrors them by putting both outputs at the same 0,0 origin in
+# one logical space - labwc then scans that same region out to both connectors.
+# This is the native compositor mirror; no extra service, no second browser.
+# The second profile keeps a single panel working when only one monitor is
+# connected. Output names are this appliance's two HDMI ports (wlr-randr).
+KANSHI_CFG="$HOME/.config/kanshi/config"
+mkdir -p "$(dirname "$KANSHI_CFG")"
+KANSHI_WANT="$(cat <<'EOF'
+profile {
+	output HDMI-A-1 enable mode 1920x1080@60.000 position 0,0 transform normal
+	output HDMI-A-2 enable mode 1920x1080@60.000 position 0,0 transform normal
+}
+
+profile {
+	output HDMI-A-1 enable mode 1920x1080@60.000 position 0,0 transform normal
+}
+EOF
+)"
+if [[ -f "$KANSHI_CFG" && ! -f "$KANSHI_CFG.before-traincam-mirror" ]]; then
+  cp "$KANSHI_CFG" "$KANSHI_CFG.before-traincam-mirror"
+fi
+if [[ "$(cat "$KANSHI_CFG" 2>/dev/null || true)" != "$KANSHI_WANT" ]]; then
+  printf '%s\n' "$KANSHI_WANT" > "$KANSHI_CFG"
+  echo "wrote kanshi mirror config ($KANSHI_CFG)"
+fi
+# kanshi reloads its config on SIGHUP; apply now without a reboot. kill -HUP on
+# the specific pid (no name-based killers).
+KPID="$(pgrep -x kanshi 2>/dev/null | head -1 || true)"
+[[ -n "$KPID" ]] && kill -HUP "$KPID" 2>/dev/null || true
+
+# Boot-time trimming (needs root). Best-effort, exactly like the blanking step:
+# the kiosk works without it, it just boots slower. See scripts/optimize-boot.sh
+# for the per-unit justification and --uninstall.
+OPT="$(dirname "$0")/optimize-boot.sh"
+if [[ -x "$OPT" ]]; then
+  "$OPT" || echo "WARNING: boot optimizer did not complete (needs sudo?)" >&2
 fi
 
 echo

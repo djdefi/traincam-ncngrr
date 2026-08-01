@@ -51,6 +51,27 @@ else
 fi
 check "stream still uses --mode 1640:1232 (else update both)" "$deployed_mode" "yes"
 
+# The tuning file is part of the streamed pipeline too. Without --tuning-file
+# the tool lets libcamera auto-load the stock imx219.json (Bayesian AWB) instead
+# of the deployed noir grey-world tuning the stream forces, and the SAME scene
+# then measured 1.56 vs 0.11 distance on 2026-08-01 - a different camera. The
+# mode/codec checks above guard this trap for size; this guards it for colour.
+#
+# Grepping the file text is NOT enough: "--tuning-file" also appears in the
+# comments and the TUNING constant, so a text grep passes even after the flag is
+# dropped from the real command. Import the module and inspect the assembled
+# CAPTURE string that actually runs - that is the only thing that can fail.
+tuning_path="$(grep -E '^traincam_tuning_file:' "$GROUP_VARS" | awk '{print $2}' | tr -d '"'\''')"
+if PYTHONPATH="$ROOT/scripts" python3 -c "
+import sys, calibrate_awb as c
+sys.exit(0 if ('--tuning-file' in c.CAPTURE and '$tuning_path' in c.CAPTURE) else 1)
+" 2>/dev/null; then
+  tuning_ok=yes
+else
+  tuning_ok=no
+fi
+check "capture command pins the stream's tuning file ($tuning_path)" "$tuning_ok" "yes"
+
 # rpicam-jpeg is the still path. It lies about what the stream shows.
 if grep -q "rpicam-jpeg" "$SCRIPT"; then
   still=yes

@@ -44,11 +44,36 @@ traincam_awb: auto
 # colour pumping as a moving camera passes coloured scenery, which is worth
 # something on its own for an unattended run.
 #
-# !! THESE NUMBERS ARE FOR ONE ROOM AND MUST BE REDONE AT THE VENUE !!
-# The procedure is in docs/HARDWARE.md and takes about a minute with a sheet
-# of white paper. Setting this to "" restores auto, which is wrong by a
-# measurable amount but never catastrophically wrong.
-traincam_awb_gains: "0.99,2.23"
+# Calibrated AT THE VENUE 2026-08-01 off the clubhouse bulletin board, through
+# the production noir pipeline: this lock scored R/G 0.981 B/G 0.995, distance
+# 0.024, where the previous "0.99,2.23" scored ~0.11 with the blue running hot.
+#
+# TWO CAVEATS, both found by re-reading the reference frame afterwards
+# (files/frame_noir_auto.jpg, files/rtsp_lock_1.01_2.04.jpg):
+#
+#  1. WRONG LIGHTING ZONE. The reference frame has a blown-out daylight window
+#     filling its right edge. The board was NOT purely room-lit, so this lock is
+#     mixed daylight+halogen - not the light the train actually runs under. That
+#     is a milder version of the same mistake as the "0.99,2.23" it replaced.
+#  2. A GOOD WHITE-CARD SCORE DOES NOT RULE OUT IR. White paper reflects IR
+#     roughly in proportion to visible, so it balances fine on a NoIR module.
+#     IR's damage is DIFFERENTIAL - it lifts materials with high IR reflectance
+#     (plaster, wood, some paints) while leaving others alone. So "converged to
+#     0.024" says nothing about IR, and the layout frame taken with this very
+#     lock still shows a salmon-pink deck and dirt while the green foam stays
+#     green. UNRESOLVED whether that residual is IR or the wrong lighting zone;
+#     it cannot be settled without hands on the hardware.
+#
+# PROVISIONAL. A white card ON THE LAYOUT under show lighting (docs/HARDWARE.md,
+# ~60s) supersedes it, and is the test that tells the two causes apart: if a
+# layout-lit card still leaves the deck pink, it is IR and needs an IR-cut
+# module, not a gain.
+# Do NOT trust `calibrate_awb.py verify` on a normal scene to judge a lock: its
+# whole-frame sampling structurally favours grey-world auto and will flag any
+# fixed lock. Judge a lock with `measure` (white card filling the frame).
+# Setting this to "" restores auto - self-correcting but colour-pumps on a
+# moving camera, which is why a lock is preferred for the unattended run.
+traincam_awb_gains: "1.01,2.04"
 # libcamera tuning. Must match the fitted module - this is where colour comes
 # from. Both modules used here have been NoIR (no IR-cut filter), so both need
 # the _noir variant or everything renders magenta: infrared leaks into the red
