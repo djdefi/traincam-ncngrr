@@ -46,7 +46,7 @@ Add this to your iPhone home screen for one-tap access.
 >
 > *[Show phone with live feed]*
 >
-> "The camera is in that freight car. It picks up power from the tracks — same power that runs the train — so no batteries to change."
+> "The camera is in that freight car, running on a battery pack that lasts about five hours."
 >
 > "It sends video over WiFi, and we can watch it on any screen — phone, tablet, TV."
 >
