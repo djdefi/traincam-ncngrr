@@ -11,21 +11,24 @@ Add this to your iPhone home screen for one-tap access.
 
 ---
 
-## iPhone Hotspot Setup
+## Network
 
-**Your phone hotspot:**
-- **Name:** _(configure on your phone)_
-- **Password:** _(configure on your phone)_
+The layout has a real router: **`traincameranet`**. The Pi auto-connects to it
+and that is the normal path — nothing to turn on.
 
-**Pi auto-connects to networks configured in NetworkManager.**
+**iPhone hotspot is the fallback only**, for when the layout router is down or
+you are demoing away from the layout. If you use it, the hotspot SSID/password
+must already be stored in the Pi's NetworkManager — it cannot be added on the
+day without SSH access to a Pi you can't reach. Set it up in advance or not at all.
 
 ---
 
 ## At the Meetup
 
-1. **Turn on hotspot:** Settings → Personal Hotspot → ON
-2. **Power on Pi Zero** — wait ~30 seconds
-3. **Open Safari:** `http://traincam1.local:8080/viewer.html`
+1. **Power on Pi Zero** — wait ~30 seconds
+2. **Open Safari:** `http://traincam1.local:8080/viewer.html`
+
+The big screen (Pi 5 kiosk) starts on its own — see `docs/RECEIVER.md`.
 
 **Works offline — no internet required!**
 
@@ -60,7 +63,7 @@ Add this to your iPhone home screen for one-tap access.
 
 | Problem | Fix |
 |---------|-----|
-| Pi not connecting | Wait 30 sec, keep Personal Hotspot screen open |
+| Pi not connecting | Check it's on `traincameranet`, not a stale network. Wait 30 sec. |
 | Page won't load | Make sure you're on the same WiFi as the Pi |
 | Video stuck on "connecting" | Refresh the page |
 | Black video | Check camera ribbon cable |
