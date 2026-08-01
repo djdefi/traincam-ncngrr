@@ -100,10 +100,22 @@ systemctl --user enable --now traincam-kiosk-www.service traincam-kiosk.service
 # Screen blanking. raspi-config's helper is used rather than `xset s off`
 # (which docs/RECEIVER.md suggests) because Pi OS Bookworm defaults to Wayland,
 # where xset is a silent no-op - it "works" and the screen still blanks.
-if command -v raspi-config >/dev/null 2>&1; then
-  sudo raspi-config nonint do_blanking 1 && echo "screen blanking disabled"
-else
+#
+# sudo -n (non-interactive) on purpose: this is the ONLY step in the whole
+# script that needs root, and a plain `sudo` here would sit forever waiting for
+# a password nobody is going to type at a kiosk. Everything above is $HOME and
+# `systemctl --user`, so the kiosk fully works without root - it would just
+# blank the screen eventually. Failing loudly and continuing beats hanging.
+if ! command -v raspi-config >/dev/null 2>&1; then
   echo "WARNING: no raspi-config; disable screen blanking yourself" >&2
+elif sudo -n raspi-config nonint do_blanking 1 2>/dev/null; then
+  echo "screen blanking disabled"
+else
+  echo >&2
+  echo "WARNING: could not disable screen blanking (needs a sudo password)." >&2
+  echo "         The kiosk still works - the screen will just blank when idle." >&2
+  echo "         Run this yourself when you have the password:" >&2
+  echo "           sudo raspi-config nonint do_blanking 1" >&2
 fi
 
 echo
