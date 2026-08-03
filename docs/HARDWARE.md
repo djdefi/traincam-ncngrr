@@ -103,6 +103,41 @@ The onboard camera runs on power harvested from the DCC track. This document des
 
 **Example:** Small USB power banks with pass-through charging (check specs)
 
+> **Meter every LiPo pigtail before it touches anything.** JST-PH has no polarity
+> standard — JST specifies the housing and crimps, not which pin is positive, so
+> the assembler decides and both conventions ship. The housing is keyed, which
+> makes it worse: it clicks in, feels right, and can still be backwards.
+>
+> Test: red probe on the red wire, black on black. A **negative** reading means
+> the colours are lying and the pigtail is reversed. Re-pin the housing (lift the
+> retention tab, swap the two crimps) before connecting anything.
+>
+> Measured 2026-08-03: a cell supplied with a Waveshare UPS HAT (C) read positive
+> only with the probes swapped, i.e. its black wire was the positive lead. The
+> board got hot on connection. The Pi survived (`throttled=0x0`, no mmc/ext4
+> errors, camera unaffected); the cell was discarded as damaged.
+
+**A UPS HAT is a real option, but check the mating and measure your load.**
+The Waveshare UPS HAT (C) ([wiki](https://www.waveshare.com/wiki/UPS_HAT_(C))) is
+the right *class* of device where a USB power bank is not: its charger does
+dynamic path management, which is the uninterrupted switchover a power-bank IC
+never promises, and its onboard INA219 reports live battery voltage/current/percent
+over I2C — useful for an unattended show. Capacity is your choice; the vendor's
+803040 1000mAh cell is the matching accessory, not a limit ("the capacity is not
+the affecting factor" — vendor FAQ).
+
+Two things to check before trusting one in a car:
+- It mates by **spring pogo pins** under screw tension, and the vendor's FAQ lists
+  poor pogo contact as a known failure mode ("tighten the screws"). Vibration in a
+  moving car is the risk; verify the I2C gauge still enumerates after a run.
+- Discharge is capped around **1.8A**, with a vendor note that an over-current load
+  makes the Pi reboot. Measure the actual 5V draw with a viewer connected (step 6
+  of *Before Installing in a Car*) rather than assuming either way — this repo has
+  never recorded that figure.
+
+Using one needs `dtparam=i2c_arm=on` and `i2c-tools`; neither is currently set by
+the playbook, so `/dev/i2c-1` does not exist and the gauge cannot be seen at all.
+
 ### 6. Camera Unit
 
 **Option A: Raspberry Pi Zero 2 W + Camera Module**
