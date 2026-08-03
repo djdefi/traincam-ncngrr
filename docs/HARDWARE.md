@@ -173,10 +173,11 @@ WiFi, CPU clocks, resolution, frame rate, and keyframe timing unchanged.
 
 ## NoIR is the wrong module for daylight
 
-**Both modules used here have been NoIR.** The IMX219 fitted Jul 2026 is one
-too, so this still applies.
+**RESOLVED 2026-08-03: an IR-cut IMX219 is now fitted, and this section is
+history plus the evidence for why the swap was right.** Keep it — the failure is
+subtle, was misdiagnosed twice, and will recur the next time a module is swapped.
 
-The module has no IR-cut filter. The `*_noir.json` tuning corrects the colour
+The first two modules were NoIR. The `*_noir.json` tuning corrects the colour
 matrix but it cannot undo the two physical costs, and no config setting will:
 
 - **Washed out.** Infrared floods every photosite. The tuning rebalances the
@@ -187,18 +188,42 @@ matrix but it cannot undo the two physical costs, and no config setting will:
 NoIR modules exist for night vision with an IR illuminator. For a lit layout an
 IR-filtered module is the correct part, and swapping is the only real fix.
 
+**What the swap actually bought** (Arducam IMX219 standard, $17, 2026-08-03).
+Both predicted symptoms cleared at once, which is the strongest evidence that
+they had one shared cause:
+
+| | NoIR + `_noir` tuning | IR-cut + plain tuning |
+|---|---|---|
+| `calibrate_awb.py verify` distance | **0.446** (bad) | **0.014** (good) |
+| Colour | salmon-pink deck and dirt | neutral |
+| Sharpness | soft | visibly sharper, no focus change |
+| `ColourTemperature` | pinned placeholder | **2915 K**, a real reading |
+| `--awb` modes | no-op — `rpi.awb` is `{"bayes": 0}` | all 7 work |
+
+That last row matters beyond colour: under noir tuning `--awb` did nothing at
+all, so `--awbgains` was the only control. The plain `imx219.json` carries a real
+`ct_curve`, so auto white balance genuinely works now and `--awb incandescent`
+is available if the venue's halogen needs it.
+
 **How bad it is depends entirely on the lighting.** Incandescent and halogen are
 blackbody radiators: a ~2800K filament emits more power in near-IR than in
 visible, and halogen floods more still. They are the worst case. Fluorescent is
 a line spectrum and modern LED emits almost no IR, so under those a NoIR module
 with the `_noir` tuning can be close to fine.
 
-**The Aug 2026 venue is mostly incandescent/halogen flood.** So this is the bad
-case, and no software setting fixes it: Bayer dyes are largely transparent above
+**The Aug 2026 venue is mostly incandescent/halogen flood.** So this was the bad
+case, and no software setting fixed it: Bayer dyes are largely transparent above
 ~700nm, which means IR lands in R, G and B at similar strength. That is a
 common-mode pedestal, and per-channel gains are multiplicative — you cannot
 subtract a common term by multiplying. This is exactly why IR-cut filters exist
 in hardware instead of in software.
+
+**A good white-card score does NOT rule out IR.** This wasted a day. White paper
+reflects IR roughly in proportion to visible light, so it balances fine on a NoIR
+module — a venue calibration scored distance 0.024 on a bulletin board while the
+layout it was for still rendered salmon-pink. IR damage is *differential*: it
+lifts materials with high IR reflectance (plaster, wood, some paints) and leaves
+others alone. Judge IR on the scene you actually shoot, never on a card.
 
 **Telling them apart, no tools:** point a TV remote at the lens and hold a
 button. On the stream, a NoIR module shows the remote's LED as an obvious bright

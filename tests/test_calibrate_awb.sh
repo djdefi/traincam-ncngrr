@@ -53,7 +53,7 @@ check "stream still uses --mode 1640:1232 (else update both)" "$deployed_mode" "
 
 # The tuning file is part of the streamed pipeline too. Without --tuning-file
 # the tool lets libcamera auto-load the stock imx219.json (Bayesian AWB) instead
-# of the deployed noir grey-world tuning the stream forces, and the SAME scene
+# of the deployed tuning the stream forces (grey-world when noir was fitted), and the SAME scene
 # then measured 1.56 vs 0.11 distance on 2026-08-01 - a different camera. The
 # mode/codec checks above guard this trap for size; this guards it for colour.
 #
