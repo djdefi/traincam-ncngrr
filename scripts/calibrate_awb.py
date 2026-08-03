@@ -96,6 +96,13 @@ def _capture(extra_args, want):
 set -u
 sudo systemctl stop traincam
 trap 'sudo systemctl start traincam' EXIT
+# systemctl returns before the sensor fd is actually released, so an immediate
+# capture dies with "Device or resource busy" and the run silently scores
+# nothing. Poll instead of a fixed sleep: usually one iteration.
+for _ in 1 2 3 4 5; do
+  fuser /dev/video0 >/dev/null 2>&1 || break
+  sleep 1
+done
 rm -f /tmp/cal_md.json /tmp/cal_*.jpg
 {CAPTURE} {extra_args} {meta} {seg} -o {sink} >/dev/null 2>&1
 """
@@ -118,7 +125,13 @@ print(json.dumps({'r': sum(p[0] for p in s)/n,
 PY
 rm -f /tmp/cal_*.jpg
 """
-    return _ssh(script)
+    out = _ssh(script)
+    if not out.strip():
+        sys.exit(
+            "capture produced nothing - the camera was probably still busy.\n"
+            "Check: ssh train@traincam1.local systemctl status traincam"
+        )
+    return out
 
 
 def measure():
