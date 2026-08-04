@@ -17,6 +17,17 @@
  button:hover { background:#444; }
  footer { margin:1rem 0 2rem; font-size:0.7rem; opacity:0.6; }
  .row { margin-top:0.5rem; }
+ /* Sits above the video (z-index auto) but below the controls (z-index 10), so a
+    volunteer can still reach Connect/Fullscreen while it is up. */
+ #offline { position:fixed; inset:0; z-index:5; background:#000; display:flex; flex-direction:column;
+            align-items:center; justify-content:center; text-align:center; gap:0.9rem; padding:2rem; }
+ #offline[hidden] { display:none; }   /* display:flex would otherwise beat [hidden] */
+ #offline h2 { margin:0; font-size:1.7rem; font-weight:600; }
+ #offline p { margin:0; max-width:34rem; line-height:1.55; opacity:0.65; }
+ #offline .dot { width:11px; height:11px; border-radius:50%; background:#e8b339;
+                 animation:pulse 1.6s ease-in-out infinite; }
+ @keyframes pulse { 0%,100% { opacity:0.25; transform:scale(0.8); } 50% { opacity:1; transform:scale(1.2); } }
+ @media (prefers-reduced-motion: reduce) { #offline .dot { animation:none; opacity:0.8; } }
 </style>
 </head>
 <body>
@@ -33,6 +44,14 @@
   </div>
   <video id="video" autoplay playsinline muted></video>
   <img id="mjpeg" hidden alt="Live camera view">
+  <!-- Public-facing, so it explains rather than reports. Starts VISIBLE: the kiosk
+       boots before the camera does, and that gap was previously a black screen. -->
+  <div id="offline">
+    <div class="dot"></div>
+    <h2>Waiting for the train camera&hellip;</h2>
+    <p>The camera rides on the train and takes its power from the rails.
+       The picture drops out in tunnels and behind scenery, then comes back on its own.</p>
+  </div>
   <footer style="position:fixed; right:0.6rem; bottom:0.4rem; margin:0; z-index:10; background:rgba(0,0,0,0.35); padding:0.25rem 0.5rem; border-radius:4px;">LAN WebRTC &lt;500ms</footer>
 <script>
 const PATH = 'traincam';
@@ -63,6 +82,12 @@ const disconnectBtn = document.getElementById('disconnectBtn');
 const fsBtn = document.getElementById('fsBtn');
 const fitBtn = document.getElementById('fitBtn');
 const autorec = document.getElementById('autorec');
+const offlineEl = document.getElementById('offline');
+// Hide it on `timeupdate`, not `playing`: currentTime only advances when frames
+// actually land, so this is the same signal the STALL_MS watchdog trusts below.
+// `playing` fires on a stream that then stalls, which would clear the card and
+// leave the public looking at a black screen again.
+videoEl.addEventListener('timeupdate', () => { if (!offlineEl.hidden) offlineEl.hidden = true; });
 
 // ponytail: ?mjpeg=<url> puts the page in MJPEG mode for the ESP32 cameras. The
 // browser is already an MJPEG decoder, so this needs an <img> and no library.
@@ -138,6 +163,7 @@ function cleanup(){ releaseResource(); if (abortController) abortController.abor
   // Drop the last frame. Leaving it on screen at a show reads as a train that
   // has stopped, not a camera that has gone away, and nobody comes to look.
   try { videoEl.srcObject = null; } catch(_){}
+  offlineEl.hidden = false;
   connectBtn.disabled=false; disconnectBtn.disabled=true; showUI(); }
 
 // A WebRTC session can sit in connectionState "connected" while media has
@@ -188,8 +214,8 @@ function startMjpeg(){
   connectBtn.disabled = true; disconnectBtn.disabled = true; autorec.checked = true;
   document.querySelector('footer').textContent = 'LAN MJPEG';
   // Cache-bust each retry or the browser will happily re-serve the dead stream.
-  const load = () => { mjpegLive = false; stageEl.src = MJPEG + (MJPEG.includes('?') ? '&' : '?') + 't=' + Date.now(); log('MJPEG ' + MJPEG); };
-  stageEl.onload = () => { mjpegLive = true; };
+  const load = () => { mjpegLive = false; offlineEl.hidden = false; stageEl.src = MJPEG + (MJPEG.includes('?') ? '&' : '?') + 't=' + Date.now(); log('MJPEG ' + MJPEG); };
+  stageEl.onload = () => { mjpegLive = true; offlineEl.hidden = true; };
   stageEl.onerror = () => { log('MJPEG lost - retrying'); setTimeout(load, 2000); };
   load();
   watchMjpeg(load);

@@ -49,8 +49,11 @@ class FakePC {
 
 const els = {};
 const makeEl = () => ({
-  textContent: '', disabled: false, checked: true, srcObject: null, style: {},
-  classList: { add() {}, remove() {} }, addEventListener() {},
+  textContent: '', disabled: false, checked: true, srcObject: null, style: {}, hidden: false,
+  classList: { add() {}, remove() {} },
+  handlers: {},
+  addEventListener(type, fn) { (this.handlers[type] ||= []).push(fn); },
+  fire(type) { (this.handlers[type] || []).forEach(fn => fn()); },
   requestFullscreen: () => Promise.resolve(),
 });
 
@@ -195,8 +198,45 @@ vm.runInThisContext(fs.readFileSync(process.argv[2], 'utf8'));
   assert.strictEqual(delays[0], 1125,
     'retry delay must be jittered by +/-25% of 1500, got ' + delays[0]);
   process.stdout.write('✓ retry delay is jittered\n');
+
+  // 11. The offline card must toggle BOTH ways. Asserting it is visible after a
+  //     loss proves nothing on its own - it starts visible - so force the
+  //     opposite state before each direction, the same bookending the image
+  //     measurements needed.
+  const offline = els.offline;
+  assert.ok(offline, 'viewer must define an #offline element');
+  FakePC.failOffer = false;
+  pendingReconnect(); await flush();
+  live().fire('connectionstatechange', 'connected');
+
+  //     Frames arriving clear it. Bound to timeupdate, not playing: currentTime
+  //     only advances when frames land, so a stream that connects then stalls
+  //     correctly keeps the card up.
+  offline.hidden = false;
+  els.video.fire('timeupdate');
+  assert.strictEqual(offline.hidden, true,
+    'arriving frames must hide the offline card');
+  process.stdout.write('✓ arriving frames hide the offline card\n');
+
+  //     Losing the stream raises it again. Without this the public sees the
+  //     black screen cleanup() deliberately creates by dropping srcObject, and
+  //     nobody can tell a dead camera from a train that has stopped.
+  FakePC.failOffer = true;
+  live().fire('connectionstatechange', 'failed');
+  assert.strictEqual(offline.hidden, false,
+    'losing the stream must re-show the offline card');
+  process.stdout.write('✓ losing the stream re-shows the offline card\n');
 })().then(() => process.exit(0)).catch(err => { process.stdout.write('✗ ' + err.message + '\n'); process.exit(1); });
 HARNESS
+
+# The card is display:flex, so a bare `[hidden]{display:none}` (specificity 0,1,0)
+# would LOSE to `#offline` (1,0,0) and the card would sit over a perfectly good
+# picture all day. Only an id-qualified override actually hides it.
+if ! grep -qE '#offline\[hidden\][[:space:]]*\{[^}]*display[[:space:]]*:[[:space:]]*none' "$TEMPLATE"; then
+  echo "✗ #offline[hidden] must set display:none, or the offline card never hides"
+  exit 1
+fi
+echo "✓ offline card has an id-qualified [hidden] override"
 
 if node "$TEMP_DIR/harness.js" "$TEMP_DIR/viewer.js"; then
   echo "==> viewer reconnect tests passed"
