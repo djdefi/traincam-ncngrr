@@ -2,6 +2,7 @@
 #include <ESPmDNS.h>
 #include <WiFi.h>
 #include <esp_task_wdt.h>
+#include <esp_wifi.h>
 
 #define CAMERA_MODEL_XIAO_ESP32S3 // Has PSRAM
 
@@ -56,6 +57,11 @@ static bool connectWiFi(uint32_t timeoutMs) {
     delay(250);
     esp_task_wdt_reset();
   }
+  // setSleep(false) above maps to WIFI_PS_NONE, but it is applied before the
+  // station has associated and the connect can put power save back. Modem sleep
+  // parks the radio between DTIM beacons, which shows up as latency spikes on a
+  // stream. Re-assert it here, after association, where it sticks.
+  esp_wifi_set_ps(WIFI_PS_NONE);
   return true;
 }
 
@@ -101,7 +107,11 @@ void setup() {
   config.pin_sccb_scl = SIOC_GPIO_NUM;
   config.pin_pwdn = PWDN_GPIO_NUM;
   config.pin_reset = RESET_GPIO_NUM;
-  config.xclk_freq_hz = 20000000;
+  // 24MHz, not the stock 20MHz. The S3's LCD_CAM peripheral generates XCLK
+  // internally rather than through LEDC, so the higher rate is available and
+  // lifts the OV2640's own ceiling (25->30fps at VGA/SVGA per mjpeg2sd's
+  // README). Watch for colour artifacts if quality is ever pushed below ~10.
+  config.xclk_freq_hz = 24000000;
   config.frame_size = FRAMESIZE_UXGA;
   config.pixel_format = PIXFORMAT_JPEG; // for streaming
   config.grab_mode = CAMERA_GRAB_WHEN_EMPTY;
@@ -145,12 +155,13 @@ void setup() {
     s->set_brightness(s, 1); // up the brightness just a bit
     s->set_saturation(s, -2); // lower the saturation
   }
-  // drop down frame size for higher initial frame rate
-  // ponytail: QVGA is small for a kiosk monitor. Left alone deliberately -
-  // raising it trades frame rate, and that is a call to make with the board in
-  // hand and the stream on screen, not blind.
+  // The stock sketch drops to QVGA here "for higher initial frame rate". On a
+  // kiosk monitor that reads as a broken camera: 320x240 at ~3.6KB a frame,
+  // stretched to full screen. Measured 2026-08-03 with the board in hand.
+  // SVGA is the starting point, not the answer - tune it live against
+  // /control?framesize=N&quality=N and set whatever wins here.
   if(config.pixel_format == PIXFORMAT_JPEG){
-    s->set_framesize(s, FRAMESIZE_QVGA);
+    s->set_framesize(s, FRAMESIZE_SVGA);
   }
 
   if (!connectWiFi(WIFI_CONNECT_TIMEOUT_MS)) {
@@ -170,6 +181,7 @@ void setup() {
     MDNS.addService("traincam", "tcp", 80);
     MDNS.addServiceTxt("traincam", "tcp", "type", "esp32");
     MDNS.addServiceTxt("traincam", "tcp", "stream", "mjpeg");
+    MDNS.addServiceTxt("traincam", "tcp", "control", "81");
   } else {
     Serial.println("mDNS setup failed; IP access remains available");
   }
@@ -177,6 +189,7 @@ void setup() {
   startCameraServer();
 
   Serial.printf("Camera ready: http://%s.local/stream\n", hostname);
+  Serial.printf("Health/tuning: http://%s.local:81/status  :81/control\n", hostname);
 }
 
 void loop() {
