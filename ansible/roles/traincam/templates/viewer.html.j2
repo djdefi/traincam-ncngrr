@@ -45,12 +45,15 @@
   <video id="video" autoplay playsinline muted></video>
   <img id="mjpeg" hidden alt="Live camera view">
   <!-- Public-facing, so it explains rather than reports. Starts VISIBLE: the kiosk
-       boots before the camera does, and that gap was previously a black screen. -->
+       boots before the camera does, and that gap was previously a black screen.
+       Copy claims only measured failure modes - an earlier draft blamed tunnels,
+       which the layout does not actually do. The real dropout is WiFi (wlan0 lost
+       association for 77s on 2026-08-01, and the SDIO wedge in docs/NETWORK.md). -->
   <div id="offline">
     <div class="dot"></div>
     <h2>Waiting for the train camera&hellip;</h2>
-    <p>The camera rides on the train and takes its power from the rails.
-       The picture drops out in tunnels and behind scenery, then comes back on its own.</p>
+    <p>This camera rides on the train, running on track power with a small battery
+       for backup. If the picture pauses it is usually the WiFi &mdash; it comes back on its own.</p>
   </div>
   <footer style="position:fixed; right:0.6rem; bottom:0.4rem; margin:0; z-index:10; background:rgba(0,0,0,0.35); padding:0.25rem 0.5rem; border-radius:4px;">LAN WebRTC &lt;500ms</footer>
 <script>
