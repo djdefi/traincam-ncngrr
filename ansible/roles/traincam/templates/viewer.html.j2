@@ -9,7 +9,7 @@
  h1 { margin:0; font-size:1.1rem; }
  #status { font-size:0.8rem; opacity:0.8; }
  #ui { position:fixed; top:2.4rem; left:0.6rem; z-index:10; display:flex; gap:0.4rem; flex-wrap:wrap; transition:opacity .4s; }
- video { position:absolute; top:0; left:0; width:100vw; height:100vh; object-fit:cover; background:#000; transition:filter .3s; }
+ video, #mjpeg { position:absolute; top:0; left:0; width:100vw; height:100vh; object-fit:cover; background:#000; transition:filter .3s; }
  footer { transition:opacity .4s; }
  body.ui-hidden header, body.ui-hidden #ui, body.ui-hidden footer { opacity:0; pointer-events:none; }
  body.ui-hidden { cursor:none; }
@@ -32,6 +32,7 @@
     <label style="font-size:0.75rem;">Auto-reconnect <input type="checkbox" id="autorec" checked></label>
   </div>
   <video id="video" autoplay playsinline muted></video>
+  <img id="mjpeg" hidden alt="Live camera view">
   <footer style="position:fixed; right:0.6rem; bottom:0.4rem; margin:0; z-index:10; background:rgba(0,0,0,0.35); padding:0.25rem 0.5rem; border-radius:4px;">LAN WebRTC &lt;500ms</footer>
 <script>
 const PATH = 'traincam';
@@ -63,10 +64,21 @@ const fsBtn = document.getElementById('fsBtn');
 const fitBtn = document.getElementById('fitBtn');
 const autorec = document.getElementById('autorec');
 
+// ponytail: ?mjpeg=<url> puts the page in MJPEG mode for the ESP32 cameras. The
+// browser is already an MJPEG decoder, so this needs an <img> and no library.
+// The ESP32-S3 cannot do WebRTC video worth having: it has no hardware H.264
+// encoder (esp_h264 compiles its hw/ path only under IDF_TARGET esp32p4) and
+// WebRTC will not carry MJPEG (RFC 7742 s5 mandates VP8/H.264). Espressif's own
+// whip_demo settings.h caps S3 at 320x240@10fps. Transcoding MJPEG->H.264
+// through the Pi's MediaMTX is possible, but it would make the standalone
+// camera depend on the Pi and delete the redundancy that is its whole point.
+const MJPEG = new URLSearchParams(window.location.search).get('mjpeg');
+const stageEl = MJPEG ? document.getElementById('mjpeg') : videoEl;
+
 function log(msg){ console.log(msg); statusEl.textContent = msg; }
 function attemptFullscreen(auto=false){
   const elem = document.fullscreenElement || document.webkitFullscreenElement;
-  if (!elem) videoEl.requestFullscreen?.().catch(()=>{ if(!auto) log('Fullscreen denied'); });
+  if (!elem) stageEl.requestFullscreen?.().catch(()=>{ if(!auto) log('Fullscreen denied'); });
 }
 function scheduleUIHide(){ clearTimeout(uiHideTimer); uiHideTimer = setTimeout(()=>{ document.body.classList.add('ui-hidden'); }, 2000); }
 function showUI(){ document.body.classList.remove('ui-hidden'); scheduleUIHide(); }
@@ -158,15 +170,62 @@ function scheduleReconnect(){
 connectBtn.onclick = () => { if (reconnectTimer){ clearTimeout(reconnectTimer); reconnectTimer=null;} retryDelay=AUTOREC_DELAY_MS; connect(); showUI(); };
 disconnectBtn.onclick = () => { if (reconnectTimer){ clearTimeout(reconnectTimer); reconnectTimer=null;} autorec.checked=false; cleanup(); log('Disconnected'); };
 fsBtn.onclick = () => { attemptFullscreen(false); showUI(); };
-fitBtn.onclick = () => { if (videoEl.style.objectFit==='contain'){ videoEl.style.objectFit='cover'; fitBtn.textContent='Fit'; } else { videoEl.style.objectFit='contain'; fitBtn.textContent='Fill'; } showUI(); };
-window.addEventListener('load', () => { connect(); setTimeout(()=>attemptFullscreen(true),600); scheduleUIHide(); });
+fitBtn.onclick = () => { if (stageEl.style.objectFit==='contain'){ stageEl.style.objectFit='cover'; fitBtn.textContent='Fit'; } else { stageEl.style.objectFit='contain'; fitBtn.textContent='Fill'; } showUI(); };
+// An MJPEG stream that dies leaves a frozen last frame, the same failure the
+// STALL_MS watchdog exists to catch on the WebRTC path. Measured in headless
+// Chrome 2026-08-03, an <img> gives us almost nothing to watch:
+//   stream cannot be opened at all -> error fires (~200ms)
+//   stream cut mid-flight          -> NO event, last frame stays up forever
+//   stream stalls, socket open     -> NO event, same
+//   load                           -> fires ONCE, not per frame
+// So error covers the kiosk-booted-before-the-camera case and nothing else, and
+// no listener can see a freeze. Poll the camera's status port for that instead.
+const MJPEG_STATUS_PORT = '81';   // firmware serves /status + /control here
+const MJPEG_POLL_MS = 5000;
+let mjpegLive = false;            // true only between a first frame and the next reload
+function startMjpeg(){
+  videoEl.hidden = true; stageEl.hidden = false;
+  connectBtn.disabled = true; disconnectBtn.disabled = true; autorec.checked = true;
+  document.querySelector('footer').textContent = 'LAN MJPEG';
+  // Cache-bust each retry or the browser will happily re-serve the dead stream.
+  const load = () => { mjpegLive = false; stageEl.src = MJPEG + (MJPEG.includes('?') ? '&' : '?') + 't=' + Date.now(); log('MJPEG ' + MJPEG); };
+  stageEl.onload = () => { mjpegLive = true; };
+  stageEl.onerror = () => { log('MJPEG lost - retrying'); setTimeout(load, 2000); };
+  load();
+  watchMjpeg(load);
+}
+// ponytail: uptime_s going backwards is the reboot tell, two dead polls in a row
+// is the gone tell, and `live` catches the rest - a reconnect that lands while
+// the camera is half up gets no load event and no error event, so without it the
+// page sits dead while /status reports fine. Covers a wedged stream task too:
+// no frame, no load, so every poll retries.
+function watchMjpeg(reload){
+  let status;
+  try {
+    const u = new URL(MJPEG, location.href);
+    u.port = MJPEG_STATUS_PORT; u.pathname = '/status'; u.search = '';
+    status = u.href;
+  } catch (e) { log('MJPEG watchdog off'); return; }
+  let lastUp = null, fails = 0;
+  setInterval(() => {
+    fetch(status + '?t=' + Date.now(), { cache: 'no-store' })
+      .then(r => r.json())
+      .then(s => {
+        if (lastUp !== null && s.uptime_s < lastUp) { log('Camera rebooted - reconnecting'); reload(); }
+        else if (!mjpegLive) { log('Camera up but no picture - reconnecting'); reload(); }
+        lastUp = s.uptime_s; fails = 0;
+      })
+      .catch(() => { if (++fails >= 2) { log('Camera unreachable - reconnecting'); reload(); lastUp = null; fails = 0; } });
+  }, MJPEG_POLL_MS);
+}
+window.addEventListener('load', () => { MJPEG ? startMjpeg() : connect(); setTimeout(()=>attemptFullscreen(true),600); scheduleUIHide(); });
 // Closing the tab or backgrounding the app on a phone otherwise leaves the
 // session open on the server forever - the exact thing a hall full of
 // wandering visitors will do all day.
 window.addEventListener('pagehide', () => { cleanup(); });
 // pagehide also fires when a phone puts the page in the back/forward cache, so
 // pick the stream back up if it is restored rather than showing a dead frame.
-window.addEventListener('pageshow', ev => { if (ev.persisted && !pc) connect(); });
+window.addEventListener('pageshow', ev => { if (ev.persisted && !pc && !MJPEG) connect(); });
 </script>
 </body>
 </html>
