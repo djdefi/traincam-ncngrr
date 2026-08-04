@@ -5,8 +5,19 @@
 # ─────────────────────────────────────────────────────────────
 # VIDEO SETTINGS
 # ─────────────────────────────────────────────────────────────
-traincam_width: 1280
-traincam_height: 720
+# Output resolution. 960x540, NOT 720p, because the encoder is bitrate-starved:
+# measured 2026-08-04, h264 at the 2500 kbit cap produced 2412 kbit/s at 1280x720
+# and 2409 kbit/s at 960x540 - IDENTICAL, because the encoder is CBR and fills
+# whatever budget it is given. So the same bits land on 921600 pixels instead of
+# 518400: 540p gets 1.78x the bits per pixel. The downscale also averages sensor
+# noise, which matters because AnalogueGain measured 10.24 at 48 lux, past the
+# 8.0 last rung of the AGC ladder in this file - the sensor is out of headroom
+# and the layout (33-41 lux) is darker still.
+# Unlike lowering the framerate, this costs NOTHING that commit 2cc35557 was
+# protecting: shutter and motion are untouched. It costs sharpness on upscale.
+# Revert to 1280/720 if the picture reads too soft on the kiosk.
+traincam_width: 960
+traincam_height: 540
 
 # Which camera sensor overlay to load. Empty = rely on camera_auto_detect,
 # which is correct for the official Raspberry Pi modules and ONLY those:
