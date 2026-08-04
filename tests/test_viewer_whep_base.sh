@@ -71,6 +71,15 @@ grep -q "whepBase" "$TPL"; check "template still honours whepBase" $?
 grep -q "srcObject = null" "$TPL"; check "clears the last frame on cleanup" $?
 grep -q "STALL_MS" "$TPL"; check "has a media stall watchdog" $?
 
+# An <img> fires error only when the stream cannot be opened at all. A stream cut
+# mid-flight, or one that stalls with the socket open, fires nothing, and load
+# fires once for the whole stream rather than per frame. Measured in headless
+# Chrome 2026-08-03. So MJPEG mode cannot detect a freeze from the <img> and has
+# to poll the camera instead; without this the kiosk shows a frozen frame all day.
+grep -q "watchMjpeg" "$TPL"; check "MJPEG mode has a liveness watchdog" $?
+grep -q "uptime_s < lastUp" "$TPL"; check "watchdog reconnects when the camera reboots" $?
+grep -q "mjpegLive" "$TPL"; check "watchdog reconnects when a reconnect got no frame" $?
+
 echo ""
 [ "$fail" = "0" ] && echo "viewer WHEP base: all passed" || echo "viewer WHEP base: FAILURES"
 exit "$fail"
