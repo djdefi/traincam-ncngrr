@@ -97,7 +97,18 @@ traincam_agc_gain: [1.0, 2.0, 4.0, 6.0, 8.0, 8.0]
 # room) the AGC was already pegged at its ceiling, 66502us and gain 5.95, and a
 # layout is darker than that. Still 1.28x supersampled into 720p. Costs a little
 # sharpness against the crop; drop this flag to trade the room back for it.
-traincam_extra_opts: "--denoise cdn_off --saturation 1.1 --bitrate 2500000 --mode 1640:1232"
+# --denoise is DELIBERATELY ABSENT so rpicam-vid uses its own default, auto.
+# It carried "cdn_off" (luma denoise on, chroma denoise OFF) from ba5b8d0, where
+# it arrived as scaffold boilerplate next to placeholder 640x480 defaults and was
+# never justified. Measured 2026-08-04 via `rpicam-vid --codec mjpeg -q 90`
+# (fixed quality, so bytes/frame tracks scene entropy - h264 has no --qp and its
+# CBR rate control hides this entirely), bytes/frame:
+#   off 239431   cdn_off 218556   cdn_hq 205471   auto 201952   cdn_fast 201151
+# So chroma denoise is worth ~8% of the bit budget, and auto == cdn_fast to
+# within the 0.55% run-to-run noise. Bitrate is HARD capped above, so bits spent
+# on incompressible chroma speckle are stolen from real detail - at a cap,
+# denoise is a bitrate multiplier, not a cosmetic filter. Do not re-add cdn_off.
+traincam_extra_opts: "--saturation 1.1 --bitrate 2500000 --mode 1640:1232"
 
 # Optional tuning (uncomment to override):
 # traincam_keyframe_interval: 48      # Defaults based on LATENCY_MODE
