@@ -119,7 +119,17 @@ traincam_agc_gain: [1.0, 2.0, 4.0, 6.0, 8.0, 8.0]
 # within the 0.55% run-to-run noise. Bitrate is HARD capped above, so bits spent
 # on incompressible chroma speckle are stolen from real detail - at a cap,
 # denoise is a bitrate multiplier, not a cosmetic filter. Do not re-add cdn_off.
-traincam_extra_opts: "--saturation 1.1 --bitrate 2500000 --mode 1640:1232"
+# --saturation is DELIBERATELY ABSENT so rpicam-vid uses its default, 1.0. It
+# carried 1.1 from 4aa081d ("Prepare TrainCam for fair operation"), the same
+# unexplained bundle that silently set --denoise cdn_off, with no rationale in
+# the message or here. Boosting chroma boosts CHROMA NOISE, which at gain 10.24
+# is the ugliest artifact in the picture. Measured 2026-08-04 as Cb/Cr stddev on
+# a flat dark subject (so the spread is noise, not content):
+#   sat 1.1 -> 13.80/12.74   sat 1.0 -> 13.19/11.74   sat 0.8 -> 10.66/9.61
+# Going below 1.0 keeps working (0.8 is ~24% less chroma noise) but a model
+# railroad is a colourful subject and washing it out is a bad trade. 1.0 just
+# stops us paying a noise penalty for a flag nobody asked for.
+traincam_extra_opts: "--bitrate 2500000 --mode 1640:1232"
 
 # Optional tuning (uncomment to override):
 # traincam_keyframe_interval: 48      # Defaults based on LATENCY_MODE
