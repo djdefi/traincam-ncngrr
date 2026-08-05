@@ -13,6 +13,26 @@ All TrainCam devices connect to a dedicated WiFi network:
 
 **Note:** ESP32 WiFi credentials go in `CameraWebServer/secrets.h`, which is gitignored — copy `secrets.h.example` to `secrets.h` and fill it in before uploading. The build fails with a clear error if it's missing. Configure the Pi network with Raspberry Pi Imager or NetworkManager.
 
+### Any saved network that outranks the layout network is an outage
+
+NetworkManager picks by `autoconnect-priority`, highest wins. A phone hotspot
+profile saved for field debugging sat at priority 10 while the layout network
+(`preconfigured`) sat at 5 — so whenever that hotspot was switched on nearby, the
+camera would leave the layout network and the kiosk would lose it. Nothing logs
+this as an error; the Pi is happily online, just not where anyone can reach it.
+
+Ansible does not manage WiFi profiles (they come from the Imager), so this is
+checked, not deployed:
+
+```bash
+nmcli -f NAME,AUTOCONNECT,AUTOCONNECT-PRIORITY con show
+```
+
+The layout network must have the highest priority of anything with
+`AUTOCONNECT: yes`. Keep debug profiles, but disarm them rather than deleting —
+`nmcli con mod <name> connection.autoconnect no` still leaves `nmcli con up
+<name>` available when you actually want it.
+
 ## Required Ports
 
 | Port | Protocol | Service | Description |
