@@ -3,11 +3,12 @@ WIDTH={{ traincam_width }}
 HEIGHT={{ traincam_height }}
 FPS={{ traincam_fps }}
 PORT={{ traincam_port }}
-AWBGAINS="{{ traincam_awbgains }}"
+AWB="{{ traincam_awb }}"
+AWB_GAINS="{{ traincam_awb_gains | default('') }}"
+TUNING_FILE="{{ traincam_tuning_file | default('') }}"
 EXTRA_OPTS="{{ traincam_extra_opts }}"
 LOG_DIR={{ traincam_log_dir }}
-{% if traincam_keyframe_interval is defined %}KEYFRAME_INTERVAL={{ traincam_keyframe_interval }}
-{% endif %}{% if traincam_qp is defined %}QP={{ traincam_qp }}
+{% if traincam_keyframe_interval is defined %}FORCE_KEYFRAME_INTERVAL={{ traincam_keyframe_interval }}
 {% endif %}{% if traincam_rpi_cam_bin is defined %}RPI_CAM_BIN={{ traincam_rpi_cam_bin }}
 {% endif %}
 # Active latency mode (templated)

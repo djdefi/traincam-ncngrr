@@ -47,7 +47,7 @@ shellcheck --shell=bash ansible/roles/traincam/templates/*.sh.j2
 | Role variables | `group_vars/traincam.yml` |
 | Stream capture script template | `ansible/roles/traincam/templates/stream.sh.j2` |
 | MediaMTX config template | `ansible/roles/traincam/templates/mediamtx.yml.j2` |
-| WebRTC viewer (development) | `client/viewer.html` |
+| WebRTC viewer (deployed template) | `ansible/roles/traincam/templates/viewer.html.j2` |
 | ESP32 firmware | `CameraWebServer/CameraWebServer.ino` |
 
 ## Conventions

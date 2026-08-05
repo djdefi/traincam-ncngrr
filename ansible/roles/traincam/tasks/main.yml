@@ -8,6 +8,8 @@
   ansible.builtin.user:
     name: "{{ traincam_user }}"
     group: "{{ traincam_group }}"
+    groups: video
+    append: true
     create_home: yes
     state: present
 
@@ -44,9 +46,11 @@
     mode: '0644'
   notify: Reload udev rules
 
-- name: Ensure ffmpeg installed
+- name: Ensure runtime packages installed
   ansible.builtin.package:
-    name: ffmpeg
+    name:
+      - avahi-daemon
+      - ffmpeg
     state: present
   become: true
 
@@ -54,6 +58,7 @@
   ansible.builtin.get_url:
     url: "{{ mediamtx_download_url }}"
     dest: /tmp/mediamtx.tar.gz
+    checksum: "{{ mediamtx_checksum }}"
     mode: '0644'
   register: mediamtx_download
 
@@ -73,7 +78,7 @@
     owner: "{{ traincam_user }}"
     group: "{{ traincam_group }}"
     mode: '0755'
-  notify: Restart traincam service
+  notify: Restart traincam
 
 - name: Deploy RTSP publish script
   ansible.builtin.template:
@@ -82,7 +87,7 @@
     owner: "{{ traincam_user }}"
     group: "{{ traincam_group }}"
     mode: '0755'
-  notify: Restart traincam service
+  notify: Restart traincam
 
 - name: Deploy stream configuration
   ansible.builtin.template:
@@ -91,7 +96,27 @@
     owner: root
     group: root
     mode: '0644'
-  notify: Restart traincam service
+  notify: Restart traincam
+
+- name: Deploy tuning file patcher
+  ansible.builtin.copy:
+    src: patch_tuning.py
+    dest: "{{ traincam_bin_dir }}/patch_tuning.py"
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Generate camera tuning file
+  ansible.builtin.command:
+    argv:
+      - "{{ traincam_bin_dir }}/patch_tuning.py"
+      - "{{ traincam_tuning_source }}"
+      - "{{ traincam_tuning_file }}"
+      - "{{ traincam_agc_shutter | to_json }}"
+      - "{{ traincam_agc_gain | to_json }}"
+  register: traincam_tuning_result
+  changed_when: "'changed' in traincam_tuning_result.stdout"
+  notify: Restart traincam
 
 - name: Deploy systemd unit
   ansible.builtin.template:
@@ -100,7 +125,7 @@
     owner: root
     group: root
     mode: '0644'
-  notify: Reload systemd and restart traincam
+  notify: Restart traincam
 
 - name: Create mediamtx config directory
   ansible.builtin.file:
@@ -126,19 +151,21 @@
     owner: root
     group: root
     mode: '0644'
-  notify: Reload systemd and restart mediamtx
+  notify: Restart mediamtx
 
 - name: Ensure mediamtx service enabled and started
   ansible.builtin.systemd:
     name: mediamtx.service
     enabled: true
     state: started
+    daemon_reload: true
 
 - name: Ensure traincam service enabled and started
   ansible.builtin.systemd:
     name: "{{ traincam_service_name }}.service"
     enabled: true
     state: started
+    daemon_reload: true
 
 - name: Create viewer web directory
   ansible.builtin.file:
@@ -156,6 +183,49 @@
     group: "{{ traincam_group }}"
     mode: '0644'
 
+- name: Deploy viewer server
+  ansible.builtin.copy:
+    src: viewer_server.py
+    dest: "{{ traincam_bin_dir }}/viewer_server.py"
+    owner: "{{ traincam_user }}"
+    group: "{{ traincam_group }}"
+    mode: '0755'
+  notify: Restart viewer
+
+- name: Remove untracked discovery server
+  ansible.builtin.file:
+    path: "{{ traincam_bin_dir }}/discovery_server.py"
+    state: absent
+  notify: Restart viewer
+
+# Measured at the layout 2026-08-01: with IPv6 enabled, avahi churned through
+# temporary link-local addresses (register/withdraw every ~1s, same addresses
+# recycling). That churn made avahi see its own announcements as a competing
+# claim, so it renamed itself traincam1 -> traincam1-2 -> traincam1-3, and the
+# surviving record pointed at 127.0.0.1. Net effect: traincam1.local did not
+# resolve at all, and stale names lingered as phantom cameras.
+# Every URL in this project uses traincam1.local, so this is load-bearing.
+# We publish over IPv4 only; nothing here needs IPv6.
+- name: Disable IPv6 in avahi to stop link-local address churn
+  ansible.builtin.lineinfile:
+    path: /etc/avahi/avahi-daemon.conf
+    regexp: '^#*\s*use-ipv6\s*='
+    line: 'use-ipv6=no'
+    insertafter: '^\[server\]'
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Restart Avahi
+
+- name: Advertise TrainCam via mDNS
+  ansible.builtin.template:
+    src: traincam-avahi.service.j2
+    dest: /etc/avahi/services/traincam.service
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Restart Avahi
+
 - name: Deploy viewer http service unit
   ansible.builtin.copy:
     dest: /etc/systemd/system/traincam-viewer.service
@@ -164,42 +234,36 @@
     mode: '0644'
     content: |
       [Unit]
-      Description=TrainCam static viewer (python http.server)
-      After=network-online.target
+      Description=TrainCam viewer server
+      After=network-online.target avahi-daemon.service
+      Wants=avahi-daemon.service
+      StartLimitIntervalSec=0
+      StartLimitBurst=0
 
       [Service]
       Type=simple
       User={{ traincam_user }}
       Group={{ traincam_group }}
       WorkingDirectory=/home/{{ traincam_user }}/www
-      ExecStart=/usr/bin/python3 -m http.server {{ traincam_viewer_port | default(8080) }} --bind 0.0.0.0
+      ExecStart=/usr/bin/python3 {{ traincam_bin_dir }}/viewer_server.py {{ traincam_viewer_port | default(8080) }} {{ traincam_port | default(8554) }} {{ traincam_webrtc_port | default(8889) }}
       Restart=always
       RestartSec=2
 
       [Install]
       WantedBy=multi-user.target
-  notify: Reload systemd and restart viewer
+  notify: Restart viewer
 
 - name: Ensure viewer service enabled and started
   ansible.builtin.systemd:
     name: traincam-viewer.service
     enabled: true
     state: started
+    daemon_reload: true
 
-# NetworkManager configuration for reliable WiFi roaming
-- name: Deploy NetworkManager WiFi roaming config
-  ansible.builtin.copy:
-    dest: /etc/NetworkManager/conf.d/10-wifi-roaming.conf
-    owner: root
-    group: root
-    mode: '0644'
-    content: |
-      [connection]
-      wifi.scan-rand-mac-address=no
-
-      [device]
-      wifi.scan-interval=30
-  notify: Restart NetworkManager
+- name: Remove obsolete NetworkManager override
+  ansible.builtin.file:
+    path: /etc/NetworkManager/conf.d/10-wifi-roaming.conf
+    state: absent
 
 # Configure WiFi network priorities (traincameranet as primary)
 - name: Set traincameranet WiFi priority
@@ -208,3 +272,229 @@
   changed_when: false
   failed_when: false
 
+- name: Boot without the unused desktop
+  ansible.builtin.file:
+    src: /lib/systemd/system/multi-user.target
+    dest: /etc/systemd/system/default.target
+    state: link
+    force: true
+
+- name: Disable console auto-login
+  ansible.builtin.file:
+    path: /etc/systemd/system/getty@tty1.service.d/autologin.conf
+    state: absent
+
+- name: Read installed services
+  ansible.builtin.service_facts:
+
+- name: Disable unused headless services
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    enabled: false
+    state: stopped
+  loop:
+    - bluetooth.service
+    - cups-browsed.service
+    - cups.service
+    - hciuart.service
+    - lightdm.service
+    - ModemManager.service
+    - wayvnc-control.service
+    - wayvnc.service
+  when: item in ansible_facts.services
+
+- name: Verify the requested camera overlay actually exists
+  ansible.builtin.stat:
+    path: "/boot/firmware/overlays/{{ traincam_camera_overlay }}.dtbo"
+  register: traincam_cam_overlay
+  when: traincam_camera_overlay | length > 0
+
+# Fail the deploy rather than the camera. A typo'd overlay otherwise costs a
+# reboot to discover, and the failure looks identical to a dead ribbon cable.
+- name: Fail early if that camera overlay is not available
+  ansible.builtin.assert:
+    that: traincam_cam_overlay.stat.exists
+    fail_msg: >-
+      No overlay /boot/firmware/overlays/{{ traincam_camera_overlay }}.dtbo.
+      List what this Pi has with:
+      ls /boot/firmware/overlays/ | grep -E 'imx|ov[0-9]'
+  when: traincam_camera_overlay | length > 0
+
+# camera_auto_detect only probes the official Raspberry Pi sensors (ov5647,
+# imx219, imx477, imx708). Arducam's own modules - imx519 16MP, ov64a40 64MP,
+# the imx462/imx327 low-light Pivariety boards - are NOT in that list and stay
+# invisible until named here, which looks exactly like a dead cable. The
+# overlays README confirms it: "Load: dtoverlay=imx519,<param>=<val>".
+# Empty = leave auto-detect alone. Requires a reboot to take effect.
+- name: Select the camera sensor overlay
+  ansible.builtin.lineinfile:
+    path: /boot/firmware/config.txt
+    regexp: '^dtoverlay=(imx|ov)[0-9][^,[:space:]]*'
+    line: "dtoverlay={{ traincam_camera_overlay }}"
+    state: "{{ 'present' if traincam_camera_overlay | length > 0 else 'absent' }}"
+
+# An explicit overlay and the auto-probe must not both run: auto_detect appends
+# its own dtoverlay for whatever it finds, so leaving it on either double-loads
+# the sensor or silently wins. Arducam's own procedure sets it to 0. Flipping it
+# back to 1 when the overlay is cleared is what makes the rollback a one-liner.
+- name: Match camera_auto_detect to the overlay choice
+  ansible.builtin.lineinfile:
+    path: /boot/firmware/config.txt
+    regexp: '^camera_auto_detect='
+    line: "camera_auto_detect={{ 0 if traincam_camera_overlay | length > 0 else 1 }}"
+
+- name: Disable unused headless hardware
+  ansible.builtin.lineinfile:
+    path: /boot/firmware/config.txt
+    regexp: "{{ item.regexp }}"
+    line: "{{ item.line }}"
+  loop:
+    - regexp: '^dtparam=audio='
+      line: 'dtparam=audio=off'
+    - regexp: '^dtparam=hdmi='
+      line: 'dtparam=hdmi=off'
+    - regexp: '^enable_tvout='
+      line: 'enable_tvout=0'
+    - regexp: '^dtoverlay=disable-bt$'
+      line: 'dtoverlay=disable-bt'
+    - regexp: '^dtparam=watchdog='
+      line: 'dtparam=watchdog=on'
+    - regexp: '^dtparam=sdio_overclock='
+      line: 'dtparam=sdio_overclock={{ traincam_sdio_overclock }}'
+  loop_control:
+    label: "{{ item.line }}"
+
+# Restart=always only helps when systemd is still alive. A hung kernel takes
+# systemd with it, and the car has to be pulled off the layout to power-cycle.
+# The BCM2835 watchdog resets the SoC without anyone touching the train.
+- name: Create systemd drop-in directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+  loop:
+    - /etc/systemd/system.conf.d
+    - /etc/systemd/journald.conf.d
+
+- name: Fail fast if the watchdog interval exceeds the hardware limit
+  ansible.builtin.assert:
+    that:
+      - traincam_watchdog_sec | int > 0
+      - traincam_watchdog_sec | int <= 15
+    fail_msg: >-
+      traincam_watchdog_sec is {{ traincam_watchdog_sec }}. The bcm2835
+      watchdog cannot exceed 15s; systemd would accept the value and then
+      silently run without a watchdog, which is worse than not having one.
+
+- name: Let systemd drive the hardware watchdog
+  ansible.builtin.copy:
+    content: |
+      # Managed by Ansible (traincam role)
+      [Manager]
+      # ponytail: the bcm2835 watchdog caps out at 15s, so this is the ceiling,
+      # not a tuning choice.
+      RuntimeWatchdogSec={{ traincam_watchdog_sec }}
+      RebootWatchdogSec=2min
+    dest: /etc/systemd/system.conf.d/10-traincam-watchdog.conf
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Reload systemd manager
+
+# The last hang left no evidence because the journal only lived in RAM.
+- name: Keep the journal across reboots
+  ansible.builtin.copy:
+    content: |
+      # Managed by Ansible (traincam role)
+      [Journal]
+      Storage=persistent
+      # Bounded so an unattended run cannot fill the card or chew SD endurance.
+      SystemMaxUse={{ traincam_journal_max_use }}
+      SystemMaxFileSize=8M
+    dest: /etc/systemd/journald.conf.d/10-traincam-persist.conf
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Restart journald
+
+# WiFi power save cycles the chip's KSO (Keep SDIO On) register. Waking it can
+# fail under load and heat, and a failed wake reports the same -110 that killed
+# the link on 2026-07-28. Nothing here needs power save; the Pi is mains- or
+# cell-powered and streaming continuously anyway.
+- name: Stop NetworkManager putting the WiFi chip to sleep
+  ansible.builtin.copy:
+    content: |
+      # Managed by Ansible (traincam role)
+      [connection]
+      # 2 = disable. Default is 3 (enable) via NM's built-in default.
+      wifi.powersave = 2
+    dest: /etc/NetworkManager/conf.d/10-traincam-wifi.conf
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Restart NetworkManager
+
+# The hardware watchdog cannot see this failure: when the brcmfmac SDIO
+# backplane wedges, brcmf_sdio_dpc() halts but never marks the bus down, so the
+# kernel stays healthy, keeps petting /dev/watchdog0, and reports wlan0 as
+# operstate=up carrier=1 while nothing can traverse it. Reaching the gateway is
+# the only honest test.
+- name: Create the netwatch state directory
+  ansible.builtin.file:
+    path: /var/lib/traincam
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Deploy the network watchdog
+  ansible.builtin.template:
+    src: netwatch.sh.j2
+    dest: /usr/local/bin/traincam-netwatch
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Deploy the network watchdog unit
+  ansible.builtin.copy:
+    content: |
+      # Managed by Ansible (traincam role)
+      [Unit]
+      Description=TrainCam network watchdog
+      # Pointless while the network is being brought up.
+      After=network-online.target
+      [Service]
+      Type=oneshot
+      ExecStart=/usr/local/bin/traincam-netwatch
+    dest: /etc/systemd/system/traincam-netwatch.service
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Deploy the network watchdog timer
+  ansible.builtin.copy:
+    content: |
+      # Managed by Ansible (traincam role)
+      [Unit]
+      Description=Run the TrainCam network watchdog every {{ traincam_netwatch_interval_sec }}s
+      [Timer]
+      # Late enough that a slow boot-time association is not mistaken for a
+      # dead radio.
+      OnBootSec=5min
+      OnUnitActiveSec={{ traincam_netwatch_interval_sec }}s
+      AccuracySec=5s
+      [Install]
+      WantedBy=timers.target
+    dest: /etc/systemd/system/traincam-netwatch.timer
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Enable the network watchdog timer
+  ansible.builtin.systemd:
+    name: traincam-netwatch.timer
+    enabled: true
+    state: started
+    daemon_reload: true

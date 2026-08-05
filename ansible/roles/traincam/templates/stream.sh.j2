@@ -8,10 +8,10 @@ IFS=$'\n\t'
 : "${HEIGHT:=720}"
 : "${FPS:=24}"
 : "${PORT:=8554}"
-: "${AWBGAINS:=1.00,1.12}"
+: "${AWB:=auto}"
 : "${EXTRA_OPTS:=}"
 : "${KEYFRAME_INTERVAL:=$((FPS*2))}"
-# Optional latency preset: LATENCY_MODE={low|ultra}
+# Optional latency preset: LATENCY_MODE={low|ultra|ultra_plus}
 #   low   -> keyframe every 1s
 #   ultra -> keyframe every ~0.5s
 if [[ "${LATENCY_MODE:-}" == "low" ]]; then
@@ -20,11 +20,14 @@ elif [[ "${LATENCY_MODE:-}" == "ultra" ]]; then
   HALF=$(( FPS / 2 ))
   if [[ $HALF -lt 1 ]]; then HALF=1; fi
   KEYFRAME_INTERVAL=$HALF
+elif [[ "${LATENCY_MODE:-}" == "ultra_plus" ]]; then
+  QUARTER=$(( FPS / 4 ))
+  if [[ $QUARTER -lt 2 ]]; then QUARTER=2; fi
+  KEYFRAME_INTERVAL=$QUARTER
 fi
 log() { echo "$(date -Is) [traincam-stream] $*" >&2; }
 log "LATENCY_MODE=${LATENCY_MODE:-unset} KEYFRAME_INTERVAL=${KEYFRAME_INTERVAL}" 
 
-: "${QP:=}"
 : "${LOG_DIR:={{ traincam_log_dir }}}"
 
 mkdir -p "$LOG_DIR"
@@ -35,16 +38,17 @@ if [[ -z "$RPI_CAM_BIN" || ! -x "$RPI_CAM_BIN" ]]; then
   log "ERROR: rpicam-vid not found"; exit 127
 fi
 
-read -r -a EXTRA_ARRAY <<< "${EXTRA_OPTS}"
+EXTRA_ARRAY=()
+if [[ -n "$EXTRA_OPTS" ]]; then
+  IFS=' ' read -r -a EXTRA_ARRAY <<< "$EXTRA_OPTS"
+fi
 CMD=("${RPI_CAM_BIN}" -t 0 --inline --listen -o "tcp://0.0.0.0:${PORT}" \
+     --nopreview --verbose 0 \
      --width "${WIDTH}" --height "${HEIGHT}" --framerate "${FPS}" \
-     --awbgains "${AWBGAINS}")
+     --awb "${AWB}")
 
 if [[ -n "${KEYFRAME_INTERVAL:-}" && "$KEYFRAME_INTERVAL" =~ ^[0-9]+$ ]]; then
   CMD+=(--intra "${KEYFRAME_INTERVAL}")
-fi
-if [[ -n "${QP}" ]]; then
-  CMD+=(--qp "${QP}")
 fi
 CMD+=("${EXTRA_ARRAY[@]}")
 

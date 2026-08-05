@@ -37,6 +37,11 @@ if [[ -f "$MEDIAMTX_TEMPLATE" ]]; then
   else
     test_case "MediaMTX has 'traincam' path defined" "found" "missing"
   fi
+  if grep -q "webrtcAddress.*traincam_webrtc_port" "$MEDIAMTX_TEMPLATE"; then
+    test_case "MediaMTX WebRTC port is configured" "found" "found"
+  else
+    test_case "MediaMTX WebRTC port is configured" "found" "missing"
+  fi
 else
   skip_case "MediaMTX template exists" "file not found"
 fi
@@ -56,14 +61,40 @@ echo "--- WiFi Configuration ---"
 # Check ESP32 firmware for WiFi settings
 ESP32_INO="CameraWebServer/CameraWebServer.ino"
 if [[ -f "$ESP32_INO" ]]; then
-  SSID=$(grep 'ssid = ' "$ESP32_INO" | grep -o '"[^"]*"' | tr -d '"' | head -1 || echo "")
-  test_case "ESP32 SSID is 'traincameranet'" "traincameranet" "$SSID"
-  
+  # Credentials must NOT be hardcoded here. This repo is public, and the old
+  # plaintext WiFi password is still in git history because it was (806f855).
+  # This assertion used to require the SSID be hardcoded, which enforced the
+  # leak rather than catching it.
+  if grep -qE '(ssid|password) *= *"' "$ESP32_INO"; then
+    test_case "ESP32 credentials not hardcoded" "clean" "hardcoded credential found"
+  else
+    test_case "ESP32 credentials not hardcoded" "clean" "clean"
+  fi
+
+  if grep -q '#include "secrets.h"' "$ESP32_INO"; then
+    test_case "ESP32 reads credentials from secrets.h" "found" "found"
+  else
+    test_case "ESP32 reads credentials from secrets.h" "found" "missing"
+  fi
+
+  # The gitignore entry is the actual protection; without it secrets.h gets
+  # committed silently the next time someone runs `git add -A`.
+  if grep -q '^CameraWebServer/secrets.h$' .gitignore 2>/dev/null; then
+    test_case "secrets.h is gitignored" "found" "found"
+  else
+    test_case "secrets.h is gitignored" "found" "missing"
+  fi
   # Check WiFi.setSleep(false) for reliable streaming
   if grep -q 'WiFi.setSleep(false)' "$ESP32_INO"; then
     test_case "ESP32 WiFi sleep disabled" "found" "found"
   else
     test_case "ESP32 WiFi sleep disabled" "found" "missing"
+  fi
+
+  if grep -q 'MDNS.addService("traincam", "tcp", 80)' "$ESP32_INO"; then
+    test_case "ESP32 advertises TrainCam mDNS service" "found" "found"
+  else
+    test_case "ESP32 advertises TrainCam mDNS service" "found" "missing"
   fi
 else
   skip_case "ESP32 WiFi config" "file not found"
@@ -80,12 +111,23 @@ if [[ -f "$INVENTORY" ]]; then
   else
     test_case "Inventory uses mDNS hostnames" "found" "missing"
   fi
+
+  AVAHI_TEMPLATE="ansible/roles/traincam/templates/traincam-avahi.service.j2"
+  if grep -q "_traincam._tcp" "$AVAHI_TEMPLATE"; then
+    test_case "Pi advertises TrainCam mDNS service" "found" "found"
+  else
+    test_case "Pi advertises TrainCam mDNS service" "found" "missing"
+  fi
 else
   skip_case "Inventory mDNS check" "file not found"
 fi
 
-# Check if viewer.html uses .local hostnames
-VIEWER="client/viewer.html"
+# Check the viewer that actually gets DEPLOYED.
+# This deliberately points at the Ansible template, not a hand copy. A previous
+# version of this test checked client/viewer.html, which stayed green while the
+# deployed template had no whepBase support at all - so the kiosk would have
+# looked for the camera on its own localhost and never connected.
+VIEWER="ansible/roles/traincam/templates/viewer.html.j2"
 if [[ -f "$VIEWER" ]]; then
   # The viewer uses location.hostname by default, with optional overrides
   if grep -q "whepBase" "$VIEWER"; then
@@ -93,8 +135,43 @@ if [[ -f "$VIEWER" ]]; then
   else
     test_case "Viewer supports WHEP base override" "found" "missing"
   fi
+  if grep -Fq '/${PATH}/whep' "$VIEWER"; then
+    test_case "Viewer uses MediaMTX WHEP path" "found" "found"
+  else
+    test_case "Viewer uses MediaMTX WHEP path" "found" "missing"
+  fi
 else
   skip_case "Viewer hostname check" "file not found"
+fi
+
+KIOSK_SETUP="scripts/setup-kiosk.sh"
+if grep -q 'ExecStartPre=.*wlr-randr' "$KIOSK_SETUP" &&
+   grep -q 'traincam-kiosk.desktop' "$KIOSK_SETUP" &&
+   grep -q 'After=.*xdg-desktop-portal.service' "$KIOSK_SETUP"; then
+  test_case "Kiosk starts from the graphical session" "found" "found"
+else
+  test_case "Kiosk starts from the graphical session" "found" "missing"
+fi
+
+# Both HDMI panels must show the stream. setup-kiosk.sh writes a kanshi mirror
+# that overlaps both outputs at the same 0,0 origin; if that line is lost the
+# second panel goes dark, which is exactly the failure this asserts against.
+if grep -q 'KANSHI_CFG' "$KIOSK_SETUP" &&
+   grep -Eq 'output HDMI-A-2 .*position 0,0' "$KIOSK_SETUP"; then
+  test_case "Kiosk mirrors both HDMI outputs" "found" "found"
+else
+  test_case "Kiosk mirrors both HDMI outputs" "found" "missing"
+fi
+
+# Slow boot was SD-card IO starvation from services the appliance does not need.
+# The optimizer must mask e2scrub_reap (the 69s hog) and stay reversible.
+BOOT_OPT="scripts/optimize-boot.sh"
+if grep -q 'e2scrub_reap.service' "$BOOT_OPT" 2>/dev/null &&
+   grep -q 'systemctl mask' "$BOOT_OPT" 2>/dev/null &&
+   grep -q -- '--uninstall' "$BOOT_OPT" 2>/dev/null; then
+  test_case "Boot optimizer masks e2scrub_reap and is reversible" "found" "found"
+else
+  test_case "Boot optimizer masks e2scrub_reap and is reversible" "found" "missing"
 fi
 
 echo ""
@@ -114,8 +191,52 @@ if [[ -f "$SERVICE_TEMPLATE" ]]; then
   else
     test_case "traincam.service starts after mediamtx" "found" "missing"
   fi
+
+  if grep -q 'Requires=mediamtx.service' "$SERVICE_TEMPLATE"; then
+    test_case "traincam.service requires mediamtx" "found" "found"
+  else
+    test_case "traincam.service requires mediamtx" "found" "missing"
+  fi
 else
   skip_case "Service dependency check" "file not found"
+fi
+
+VIEWER_SERVER="ansible/roles/traincam/files/viewer_server.py"
+if python3 -m py_compile "$VIEWER_SERVER"; then
+  test_case "Viewer server compiles" "ok" "ok"
+else
+  test_case "Viewer server compiles" "ok" "failed"
+fi
+STATUS_SCHEMA=$(python3 - "$VIEWER_SERVER" <<'PY'
+import importlib.util
+import sys
+
+spec = importlib.util.spec_from_file_location("viewer_server", sys.argv[1])
+module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
+required = {"hostname", "uptime_s", "temperature_c", "ip", "type", "stream"}
+print("ok" if required <= module.get_status().keys() else "missing")
+PY
+)
+test_case "Viewer status schema is complete" "ok" "$STATUS_SCHEMA"
+
+echo ""
+echo "--- Headless Power Configuration ---"
+
+TRAINCAM_TASKS="ansible/roles/traincam/tasks/main.yml"
+if grep -q '/lib/systemd/system/multi-user.target' "$TRAINCAM_TASKS"; then
+  test_case "Camera Pi boots headless" "found" "found"
+else
+  test_case "Camera Pi boots headless" "found" "missing"
+fi
+
+HEADLESS_SETTINGS=$(grep -Ec "line: '(dtparam=audio=off|dtparam=hdmi=off|enable_tvout=0|dtoverlay=disable-bt)'" "$TRAINCAM_TASKS")
+test_case "Unused headless hardware is disabled" "4" "$HEADLESS_SETTINGS"
+
+if grep -A4 'Remove obsolete NetworkManager override' "$TRAINCAM_TASKS" | grep -q 'state: absent'; then
+  test_case "Invalid NetworkManager override is removed" "found" "found"
+else
+  test_case "Invalid NetworkManager override is removed" "found" "missing"
 fi
 
 echo ""

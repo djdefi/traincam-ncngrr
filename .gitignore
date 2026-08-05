@@ -43,3 +43,6 @@ id_rsa*
 # Local development
 .env
 .env.local
+
+# ESP32 WiFi credentials - never commit (repo is public)
+CameraWebServer/secrets.h

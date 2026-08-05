@@ -9,7 +9,7 @@
  h1 { margin:0; font-size:1.1rem; }
  #status { font-size:0.8rem; opacity:0.8; }
  #ui { position:fixed; top:2.4rem; left:0.6rem; z-index:10; display:flex; gap:0.4rem; flex-wrap:wrap; transition:opacity .4s; }
- video { position:absolute; top:0; left:0; width:100vw; height:100vh; object-fit:cover; background:#000; transition:filter .3s; }
+ video, #mjpeg { position:absolute; top:0; left:0; width:100vw; height:100vh; object-fit:cover; background:#000; transition:filter .3s; }
  footer { transition:opacity .4s; }
  body.ui-hidden header, body.ui-hidden #ui, body.ui-hidden footer { opacity:0; pointer-events:none; }
  body.ui-hidden { cursor:none; }
@@ -32,12 +32,29 @@
     <label style="font-size:0.75rem;">Auto-reconnect <input type="checkbox" id="autorec" checked></label>
   </div>
   <video id="video" autoplay playsinline muted></video>
+  <img id="mjpeg" hidden alt="Live camera view">
   <footer style="position:fixed; right:0.6rem; bottom:0.4rem; margin:0; z-index:10; background:rgba(0,0,0,0.35); padding:0.25rem 0.5rem; border-radius:4px;">LAN WebRTC &lt;500ms</footer>
 <script>
 const PATH = 'traincam';
 // Derive MediaMTX base (viewer served on 8080; mediamtx on 8889 by default)
-const MTX_BASE = (() => { try { const u = new URL(window.location.href); u.port='8889'; return u.origin; } catch(_) { return window.location.origin; } })();
+// Where to reach MediaMTX. Normally this page is served BY the camera, so the
+// port swap below is right. But scripts/setup-kiosk.sh deliberately serves a
+// cached copy from the kiosk's OWN localhost, so that a camera which is off,
+// on a battery swap, or out of range leaves a retrying page rather than a
+// Chromium error page that never retries. In that setup window.location points
+// at the kiosk, not the camera, so an explicit ?whepBase= has to win.
+const MTX_BASE = (() => {
+  const qs = new URLSearchParams(window.location.search);
+  const explicit = qs.get('whepBase');
+  if (explicit) { try { return new URL(explicit).origin; } catch(_) {} }
+  const port = qs.get('whepPort') || '{{ traincam_webrtc_port | default(8889) }}';
+  const host = qs.get('whepHost');
+  try { const u = new URL(window.location.href); if (host) u.hostname = host; u.port = port; return u.origin; }
+  catch(_) { return window.location.origin; }
+})();
 const AUTOREC_DELAY_MS = 1500;
+const AUTOREC_MAX_MS = 15000;
+let retryDelay = AUTOREC_DELAY_MS;
 let pc, abortController, reconnectTimer, uiHideTimer;
 const statusEl = document.getElementById('status');
 const videoEl = document.getElementById('video');
@@ -47,55 +64,168 @@ const fsBtn = document.getElementById('fsBtn');
 const fitBtn = document.getElementById('fitBtn');
 const autorec = document.getElementById('autorec');
 
+// ponytail: ?mjpeg=<url> puts the page in MJPEG mode for the ESP32 cameras. The
+// browser is already an MJPEG decoder, so this needs an <img> and no library.
+// The ESP32-S3 cannot do WebRTC video worth having: it has no hardware H.264
+// encoder (esp_h264 compiles its hw/ path only under IDF_TARGET esp32p4) and
+// WebRTC will not carry MJPEG (RFC 7742 s5 mandates VP8/H.264). Espressif's own
+// whip_demo settings.h caps S3 at 320x240@10fps. Transcoding MJPEG->H.264
+// through the Pi's MediaMTX is possible, but it would make the standalone
+// camera depend on the Pi and delete the redundancy that is its whole point.
+const MJPEG = new URLSearchParams(window.location.search).get('mjpeg');
+const stageEl = MJPEG ? document.getElementById('mjpeg') : videoEl;
+
 function log(msg){ console.log(msg); statusEl.textContent = msg; }
 function attemptFullscreen(auto=false){
   const elem = document.fullscreenElement || document.webkitFullscreenElement;
-  if (!elem) videoEl.requestFullscreen?.().catch(()=>{ if(!auto) log('Fullscreen denied'); });
+  if (!elem) stageEl.requestFullscreen?.().catch(()=>{ if(!auto) log('Fullscreen denied'); });
 }
 function scheduleUIHide(){ clearTimeout(uiHideTimer); uiHideTimer = setTimeout(()=>{ document.body.classList.add('ui-hidden'); }, 2000); }
 function showUI(){ document.body.classList.remove('ui-hidden'); scheduleUIHide(); }
 ['mousemove','keydown','touchstart'].forEach(ev=>window.addEventListener(ev, showUI,{passive:true}));
 
+// WHEP hands back the session URL in the Location header, and the server only
+// frees the session when we DELETE it. Without this a tab close, a refresh or
+// any reconnect strands a session server-side: MediaMTX keeps writing to a
+// reader that stopped reading and burns the wifi TX path on it. Observed 3
+// stale sessions at once, one of which ran 28 minutes.
+let resource = null;
+
+// ponytail: deliberately NOT on abortController - cleanup() aborts that, which
+// would cancel the very request that frees the session. keepalive lets it
+// outlive the page on a tab close.
+function releaseResource(){
+  if (!resource) return;
+  const url = resource; resource = null;
+  try { fetch(url, {method:'DELETE', keepalive:true, cache:'no-store'}).catch(()=>{}); } catch(_){}
+}
+
 async function connect(){
   if (pc) { log('Already connected'); return; }
   abortController = new AbortController();
   log('Creating PeerConnection...');
-  pc = new RTCPeerConnection({ iceServers: [] });
-  pc.addEventListener('track', ev => { if (ev.track.kind==='video') videoEl.srcObject = ev.streams[0]; });
-  pc.addEventListener('connectionstatechange', () => {
-    log('State: ' + pc.connectionState);
-    if (['disconnected','failed','closed'].includes(pc.connectionState)) { cleanup(); if (autorec.checked) scheduleReconnect(); }
+  // ponytail: `conn` is the local handle; every callback ignores itself once
+  // `pc` no longer points at it, so a late event from a dead connection can't
+  // tear down the live one.
+  const conn = pc = new RTCPeerConnection({ iceServers: [] });
+  const fail = msg => { if (pc !== conn) return; log(msg); cleanup(); if (autorec.checked) scheduleReconnect(); };
+  conn.addEventListener('track', ev => { if (pc === conn && ev.track.kind==='video') videoEl.srcObject = ev.streams[0]; });
+  conn.addEventListener('connectionstatechange', () => {
+    if (pc !== conn) return;
+    if (['disconnected','failed','closed'].includes(conn.connectionState)) fail('State: ' + conn.connectionState);
+    else { if (conn.connectionState === 'connected') { retryDelay = AUTOREC_DELAY_MS; lastMediaAt = Date.now(); lastMediaTime = -1; } log('State: ' + conn.connectionState); }
   });
-  pc.addTransceiver('video',{direction:'recvonly'});
-  const offer = await pc.createOffer();
-  await pc.setLocalDescription(offer);
-  const base = MTX_BASE.replace(/\/$/,'');
-  const primary = `${base}/whep/${PATH}`;
-  const legacy = `${base}/${PATH}/whep`;
-  let resp, attempt = 0;
-  for (const url of [primary, legacy]) {
-    attempt++; log(`WHEP attempt ${attempt}: POST ${url}`);
-    try { resp = await fetch(url,{method:'POST',body:offer.sdp,headers:{'Content-Type':'application/sdp','Accept':'application/sdp'},cache:'no-store',signal:abortController.signal}); }
-    catch(e){ log('Fetch error: '+e); resp=null; }
-    if (resp && resp.ok) { log(`WHEP attempt ${attempt} succeeded (${resp.status})`); break; }
-    if (resp && resp.status===404) { log('Primary pattern 404, trying fallback...'); continue; }
-    if (resp) { log(`WHEP rejected on attempt ${attempt}: ${resp.status}`); cleanup(); if (autorec.checked) scheduleReconnect(); return; }
-    cleanup(); if (autorec.checked) scheduleReconnect(); return;
-  }
-  if (!resp || !resp.ok) { log('WHEP 404 on all patterns'); cleanup(); if (autorec.checked) scheduleReconnect(); return; }
-  const answerSdp = await resp.text();
-  await pc.setRemoteDescription({type:'answer', sdp:answerSdp});
+  conn.addTransceiver('video',{direction:'recvonly'});
+  try {
+    const offer = await conn.createOffer();
+    await conn.setLocalDescription(offer);
+    const base = MTX_BASE.replace(/\/$/,'');
+    const resp = await fetch(`${base}/${PATH}/whep`,{method:'POST',body:offer.sdp,headers:{'Content-Type':'application/sdp','Accept':'application/sdp'},cache:'no-store',signal:abortController.signal});
+    if (!resp.ok) throw new Error(`WHEP rejected: ${resp.status}`);
+    // Location is relative ("/traincam/whep/<uuid>"), so resolve it against
+    // the WHEP origin rather than this page's.
+    const loc = resp.headers.get('Location');
+    if (loc) { try { resource = new URL(loc, base).href; } catch(_){ resource = null; } }
+    const answerSdp = await resp.text();
+    await conn.setRemoteDescription({type:'answer', sdp:answerSdp});
+  } catch(e){ fail('Connect error: ' + e); return; }
+  if (pc !== conn) return;
   log('Connected');
   connectBtn.disabled = true; disconnectBtn.disabled = false; showUI();
 }
 
-function cleanup(){ if (abortController) abortController.abort(); if (pc){ try{ pc.close(); }catch(_){} } pc=null; connectBtn.disabled=false; disconnectBtn.disabled=true; showUI(); }
-function scheduleReconnect(){ if (reconnectTimer) return; reconnectTimer=setTimeout(()=>{ reconnectTimer=null; connect(); }, AUTOREC_DELAY_MS); log('Reconnecting in '+AUTOREC_DELAY_MS+'ms...'); }
-connectBtn.onclick = () => { if (reconnectTimer){ clearTimeout(reconnectTimer); reconnectTimer=null;} connect(); showUI(); };
+function cleanup(){ releaseResource(); if (abortController) abortController.abort(); if (pc){ try{ pc.close(); }catch(_){} } pc=null; lastMediaAt=0;
+  // Drop the last frame. Leaving it on screen at a show reads as a train that
+  // has stopped, not a camera that has gone away, and nobody comes to look.
+  try { videoEl.srcObject = null; } catch(_){}
+  connectBtn.disabled=false; disconnectBtn.disabled=true; showUI(); }
+
+// A WebRTC session can sit in connectionState "connected" while media has
+// stopped arriving, so connectionstatechange never fires and the kiosk shows a
+// frozen frame indefinitely. That is not hypothetical here: wlan0 was measured
+// dropping the association for 77s at the layout on 2026-08-01
+// (NetworkManager reason 'ssid-not-found'). Watch the video clock, which only
+// advances when frames actually land, rather than trusting the peer state.
+const STALL_MS = 8000;
+let lastMediaTime = -1, lastMediaAt = 0;
+setInterval(() => {
+  if (!pc || pc.connectionState !== 'connected' || !lastMediaAt) return;
+  const t = videoEl.currentTime, now = Date.now();
+  if (t !== lastMediaTime) { lastMediaTime = t; lastMediaAt = now; return; }
+  if (now - lastMediaAt > STALL_MS) { log('Stalled - reconnecting'); cleanup(); if (autorec.checked) scheduleReconnect(); }
+}, 2000);
+// ponytail: jittered exponential backoff, not a fixed retry. Measured Jul 28:
+// ONE tab opened 143 WHEP sessions in 5 minutes, creations 1.57-1.63s apart
+// (= AUTOREC_DELAY_MS + round trip), all from a single source port, while the
+// SDIO radio was already failing. The jitter matters more than the backoff at
+// a show: without it every phone in the hall retries on the same tick and they
+// hit the AP together.
+function scheduleReconnect(){
+  if (reconnectTimer) return;
+  const wait = Math.round(retryDelay * (0.75 + Math.random()*0.5));
+  retryDelay = Math.min(retryDelay*2, AUTOREC_MAX_MS);
+  reconnectTimer = setTimeout(()=>{ reconnectTimer=null; connect(); }, wait);
+  log('Reconnecting in '+wait+'ms...');
+}
+connectBtn.onclick = () => { if (reconnectTimer){ clearTimeout(reconnectTimer); reconnectTimer=null;} retryDelay=AUTOREC_DELAY_MS; connect(); showUI(); };
 disconnectBtn.onclick = () => { if (reconnectTimer){ clearTimeout(reconnectTimer); reconnectTimer=null;} autorec.checked=false; cleanup(); log('Disconnected'); };
 fsBtn.onclick = () => { attemptFullscreen(false); showUI(); };
-fitBtn.onclick = () => { if (videoEl.style.objectFit==='contain'){ videoEl.style.objectFit='cover'; fitBtn.textContent='Fit'; } else { videoEl.style.objectFit='contain'; fitBtn.textContent='Fill'; } showUI(); };
-window.addEventListener('load', () => { connect(); setTimeout(()=>attemptFullscreen(true),600); scheduleUIHide(); });
+fitBtn.onclick = () => { if (stageEl.style.objectFit==='contain'){ stageEl.style.objectFit='cover'; fitBtn.textContent='Fit'; } else { stageEl.style.objectFit='contain'; fitBtn.textContent='Fill'; } showUI(); };
+// An MJPEG stream that dies leaves a frozen last frame, the same failure the
+// STALL_MS watchdog exists to catch on the WebRTC path. Measured in headless
+// Chrome 2026-08-03, an <img> gives us almost nothing to watch:
+//   stream cannot be opened at all -> error fires (~200ms)
+//   stream cut mid-flight          -> NO event, last frame stays up forever
+//   stream stalls, socket open     -> NO event, same
+//   load                           -> fires ONCE, not per frame
+// So error covers the kiosk-booted-before-the-camera case and nothing else, and
+// no listener can see a freeze. Poll the camera's status port for that instead.
+const MJPEG_STATUS_PORT = '81';   // firmware serves /status + /control here
+const MJPEG_POLL_MS = 5000;
+let mjpegLive = false;            // true only between a first frame and the next reload
+function startMjpeg(){
+  videoEl.hidden = true; stageEl.hidden = false;
+  connectBtn.disabled = true; disconnectBtn.disabled = true; autorec.checked = true;
+  document.querySelector('footer').textContent = 'LAN MJPEG';
+  // Cache-bust each retry or the browser will happily re-serve the dead stream.
+  const load = () => { mjpegLive = false; stageEl.src = MJPEG + (MJPEG.includes('?') ? '&' : '?') + 't=' + Date.now(); log('MJPEG ' + MJPEG); };
+  stageEl.onload = () => { mjpegLive = true; };
+  stageEl.onerror = () => { log('MJPEG lost - retrying'); setTimeout(load, 2000); };
+  load();
+  watchMjpeg(load);
+}
+// ponytail: uptime_s going backwards is the reboot tell, two dead polls in a row
+// is the gone tell, and `live` catches the rest - a reconnect that lands while
+// the camera is half up gets no load event and no error event, so without it the
+// page sits dead while /status reports fine. Covers a wedged stream task too:
+// no frame, no load, so every poll retries.
+function watchMjpeg(reload){
+  let status;
+  try {
+    const u = new URL(MJPEG, location.href);
+    u.port = MJPEG_STATUS_PORT; u.pathname = '/status'; u.search = '';
+    status = u.href;
+  } catch (e) { log('MJPEG watchdog off'); return; }
+  let lastUp = null, fails = 0;
+  setInterval(() => {
+    fetch(status + '?t=' + Date.now(), { cache: 'no-store' })
+      .then(r => r.json())
+      .then(s => {
+        if (lastUp !== null && s.uptime_s < lastUp) { log('Camera rebooted - reconnecting'); reload(); }
+        else if (!mjpegLive) { log('Camera up but no picture - reconnecting'); reload(); }
+        lastUp = s.uptime_s; fails = 0;
+      })
+      .catch(() => { if (++fails >= 2) { log('Camera unreachable - reconnecting'); reload(); lastUp = null; fails = 0; } });
+  }, MJPEG_POLL_MS);
+}
+window.addEventListener('load', () => { MJPEG ? startMjpeg() : connect(); setTimeout(()=>attemptFullscreen(true),600); scheduleUIHide(); });
+// Closing the tab or backgrounding the app on a phone otherwise leaves the
+// session open on the server forever - the exact thing a hall full of
+// wandering visitors will do all day.
+window.addEventListener('pagehide', () => { cleanup(); });
+// pagehide also fires when a phone puts the page in the back/forward cache, so
+// pick the stream back up if it is restored rather than showing a dead frame.
+window.addEventListener('pageshow', ev => { if (ev.persisted && !pc && !MJPEG) connect(); });
 </script>
 </body>
 </html>

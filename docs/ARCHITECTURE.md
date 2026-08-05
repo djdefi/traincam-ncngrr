@@ -56,19 +56,14 @@ A small computer with a camera, small enough to fit in a freight car or behind a
 
 | Option | Size | Best For |
 |--------|------|----------|
-| Raspberry Pi Zero W | Credit card size | Higher quality video, more features |
+| Raspberry Pi Zero 2 W | Credit card size | Validated 720p WebRTC camera |
 | ESP32-S3 | Postage stamp size | Smaller spaces, simpler setup |
 
 **Power:** The camera harvests electricity from the track rails (the same power that runs the train), converts it to the right voltage, and stores some in a small battery for backup.
 
-### Part 2: The Streaming Server
+### Part 2: The Streaming Services
 
-A Raspberry Pi (small computer) sitting trackside that:
-- Receives the video signal over WiFi
-- Converts it to a format browsers can display
-- Serves it to anyone who wants to watch
-
-**Why not stream directly?** The onboard camera is tiny and battery-limited. Offloading the heavy work to a trackside computer means better video and longer runtime.
+The onboard Pi also runs MediaMTX and the viewer server. It republishes the camera's H.264 stream as WebRTC and RTSP without transcoding, so no separate trackside server is required.
 
 ### Part 3: The Display
 
@@ -87,7 +82,7 @@ All the parts talk to each other over a private WiFi network called `traincamera
 
 | Component | Recommended | Notes |
 |-----------|-------------|-------|
-| Onboard camera | Raspberry Pi Zero W + Camera Module v2 | Or ESP32-S3 for tighter spaces |
+| Onboard camera | Raspberry Pi Zero 2 W + Camera Module v2 | Or ESP32-S3 for tighter spaces |
 | Streaming server | Raspberry Pi 4 or 5 | Can be same device as display |
 | Display | Raspberry Pi 5 + HDMI monitor | Auto-starts on boot |
 | Power supply | See [HARDWARE.md](HARDWARE.md) | DCC → rectifier → buck → battery → camera |
@@ -96,15 +91,12 @@ All the parts talk to each other over a private WiFi network called `traincamera
 ### Software Stack
 
 ```
-ONBOARD CAMERA (Pi Zero)          STREAMING SERVER           DISPLAY
-┌─────────────────────┐          ┌──────────────────┐      ┌─────────────────┐
-│ rpicam-vid          │          │ MediaMTX         │      │ Chromium        │
-│ (captures H.264)    │──WiFi───►│ (RTSP + WebRTC)  │─────►│ (kiosk mode)    │
-│         │           │          │                  │      │                 │
-│         ▼           │          │ Python HTTP      │      │ viewer.html     │
-│ ffmpeg              │          │ (serves viewer)  │      │                 │
-│ (sends to server)   │          │                  │      │                 │
-└─────────────────────┘          └──────────────────┘      └─────────────────┘
+ONBOARD CAMERA (Pi Zero 2 W)                              DISPLAY
+┌──────────────────────────────────────────┐            ┌─────────────────┐
+│ rpicam-vid → ffmpeg → MediaMTX           │───WiFi────►│ Browser or app  │
+│                         │                │            │                 │
+│                  viewer server           │            │ viewer.html     │
+└──────────────────────────────────────────┘            └─────────────────┘
 ```
 
 ### Quick Start
@@ -175,7 +167,7 @@ traincam-ncngrr/
 
 3. **rpicam-vid + ffmpeg pipeline** — Pi's native camera tool pipes H.264 directly to ffmpeg, which sends it to MediaMTX via RTSP. No re-encoding.
 
-4. **Battery-backed power** — USB battery bank buffers the DCC track power, keeping the Pi running through dirty track and switch gaps.
+4. **Battery-backed power** — A USB battery bank sits between the track pickups and the Pi so the camera can ride out dirty track and switch gaps. This only works with a bank that has *true uninterruptible* pass-through: many banks glitch their output while switching between charging and discharging, which reboots the Pi on every gap. Measured on 2026-07-31: the bank fitted at the time dropped the Pi in under a second when its input was removed, despite running fine for 104 minutes on its cells alone. Test the specific bank before trusting it — see `docs/HARDWARE.md`.
 
 5. **mDNS for discovery** — Devices find each other by name (`traincam1.local`) rather than IP addresses.
 
@@ -202,9 +194,8 @@ traincam-ncngrr/
 3. Document in this file
 
 **ESP32 improvements:**
-1. mDNS discovery (see `issues/1.md`)
-2. OTA firmware updates
-3. Configuration via web interface
+1. OTA firmware updates
+2. Configuration via web interface
 
 ### Future Roadmap
 

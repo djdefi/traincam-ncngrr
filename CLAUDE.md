@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-TrainCam is a live camera streaming system for model railroads. A tiny camera mounted on a moving train streams video over local WiFi, powered from DCC track power. Two hardware platforms are supported: Raspberry Pi Zero W (primary) and ESP32-S3 XIAO Sense.
+TrainCam is a live camera streaming system for model railroads. A tiny camera mounted on a moving train streams video over local WiFi, powered from DCC track power. Two hardware platforms are supported: Raspberry Pi Zero 2 W (primary) and ESP32-S3 XIAO Sense.
 
 ## Commands
 
@@ -61,7 +61,7 @@ rpicam-vid (H.264) → MediaMTX (RTSP ingest) → WebRTC/RTSP out
 | Stream capture script template | `ansible/roles/traincam/templates/stream.sh.j2` |
 | RTSP publish script template | `ansible/roles/traincam/templates/publish.sh.j2` |
 | MediaMTX config template | `ansible/roles/traincam/templates/mediamtx.yml.j2` |
-| WebRTC viewer (standalone) | `client/viewer.html` |
+| WebRTC viewer (deployed template) | `ansible/roles/traincam/templates/viewer.html.j2` |
 | ESP32 firmware | `CameraWebServer/CameraWebServer.ino` |
 | iOS app entry point | `ios/TrainCam/TrainCam/TrainCamApp.swift` |
 | iOS camera discovery | `ios/TrainCam/TrainCam/CameraDiscovery.swift` |

@@ -5,6 +5,7 @@ Wants=network-online.target
 StartLimitIntervalSec=0
 StartLimitBurst=0
 ConditionPathExists=/usr/local/bin/mediamtx
+Requires=mediamtx.service
 After=mediamtx.service
 
 [Service]

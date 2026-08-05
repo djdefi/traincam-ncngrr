@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Test latency mode keyframe interval calculation
-# This tests the logic from publish.sh.j2 / stream.sh
+# This tests the logic from publish.sh.j2 / stream.sh.j2
 set -uo pipefail
 
 PASS=0

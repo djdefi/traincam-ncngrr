@@ -18,6 +18,36 @@ The display receiver is configured to:
 
 ## Auto-Start Configuration
 
+### Recommended: `scripts/setup-kiosk.sh`
+
+Run it on the Pi 5:
+
+```bash
+./scripts/setup-kiosk.sh              # CAMERA=traincam1.local by default
+./scripts/setup-kiosk.sh --uninstall  # undo
+```
+
+It keeps a **local copy of `viewer.html` and serves it from localhost**, then
+points Chromium at that with `?whepBase=` aimed at the camera.
+
+That indirection is the point. `viewer.html` is normally served *by the camera*,
+so if the camera is down when Chromium loads the page, Chromium shows a network
+error page and never retries — there is no reload logic on an error page. Once
+the page *is* loaded it reconnects on its own, so a camera that vanishes
+mid-show recovers unaided. Serving locally means the page always loads and the
+existing WHEP reconnect covers the rest.
+
+This matters because the camera runs on battery (measured 5.32 h) and packs get
+swapped mid-show, so the camera is *expected* to be absent for a minute at a
+time. Any kiosk reboot or Chromium restart in that window would otherwise leave
+a dead screen until someone notices.
+
+The script also sets `Restart=always`, suppresses the "Restore pages?" bubble
+that would otherwise sit over the video after a power cut, and disables screen
+blanking via `raspi-config` rather than `xset` — see the warning below.
+
+The two manual options below still work and are kept for reference.
+
 ### Option A: Autostart Desktop Entry
 
 Create `~/.config/autostart/traincam-viewer.desktop`:
@@ -105,5 +135,10 @@ chromium-browser --kiosk http://traincam1.local:8080/viewer.html http://traincam
 
 For best results:
 - Set Pi display resolution to match your monitor
-- Disable screen blanking: `xset s off && xset -dpms`
+- Disable screen blanking: `sudo raspi-config nonint do_blanking 1`
 - Hide mouse cursor: `unclutter -idle 1` (install with `apt install unclutter`)
+
+> **Do not use `xset s off && xset -dpms` on Bookworm.** Pi OS Bookworm defaults
+> to Wayland, where `xset` is a silent no-op — it appears to succeed and the
+> screen still blanks partway through the show. Use the `raspi-config` command
+> above, which handles both X11 and Wayland.

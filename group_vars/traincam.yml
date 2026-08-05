@@ -7,16 +7,120 @@
 # ─────────────────────────────────────────────────────────────
 traincam_width: 1280
 traincam_height: 720
+
+# Which camera sensor overlay to load. Empty = rely on camera_auto_detect,
+# which is correct for the official Raspberry Pi modules and ONLY those:
+# ov5647 (Camera v1, what is fitted now), imx219 (v2), imx477 (HQ), imx708 (v3).
+#
+# Arducam's own boards are not in that probe list and will look completely
+# undetected - identical symptoms to a dead ribbon - until named here:
+#   imx519    Arducam 16MP autofocus (B0371 etc)
+#   ov64a40   Arducam 64MP Hawkeye
+#   imx462    Arducam low-light  (also imx290/imx327/imx335/imx415)
+#   imx296    global shutter
+#   imx477    Arducam HQ variants
+#   imx708    Arducam Camera-3 variants
+# Confirm what this Pi actually has before setting it:
+#   ls /boot/firmware/overlays/ | grep -E 'imx|ov[0-9]'
+# The deploy asserts the .dtbo exists, so a typo fails the run, not the camera.
+# Requires a reboot to take effect.
+# Set Jul 29 after fitting an "OMP camera v2.3" (IMX219). It had previously
+# "not been detected" - that was never a hardware fault. camera_auto_detect
+# failed to probe it, which is indistinguishable from a dead ribbon cable.
+# Named here it comes up first try: rpicam-vid --list-cameras reports
+# imx219 [3280x2464] with a 1640x1232 full-FOV binned mode, so 1280x720 is
+# 1.28x downsampled instead of the ov5647's ~1:1. Reverting to "" plus the
+# ov5647 tuning below is the whole rollback.
+traincam_camera_overlay: "imx219"
 traincam_fps: 24
-traincam_awbgains: "1.00,1.12"
-traincam_extra_opts: "--denoise off"
+traincam_awb: auto
+# Locked white balance, "RED,BLUE". Empty falls back to --awb above.
+#
+# EMPTY ON PURPOSE since the IR-cut module went in 2026-08-03. Every lock this
+# project ever shipped was calibrated under light the train does not run under,
+# and each one was worse than auto by the time it mattered. Auto is now
+# genuinely good, which it never was before: the stock imx219.json carries a
+# real ct_curve and Bayesian AWB, so `--awb` modes actually do something and
+# ColourTemperature is a real reading (2915K measured, a warm room) rather than
+# the pinned placeholder the noir tuning reported.
+#
+# Re-lock ONLY if colour visibly pumps as the train passes coloured scenery,
+# and only from a white card under show lighting:
+#   ./scripts/calibrate_awb.py measure
+# Judge a lock with `measure`, never with `verify` on a normal scene - verify's
+# whole-frame sampling is what grey-world optimises, so it flatters auto and
+# will flag any correct lock as BAD.
+#
+# History, kept because it cost real time: video AWB converges differently from
+# the still path (stills [0.989, 2.230] vs video [0.863, 2.037] on one scene),
+# so a still is not evidence about the stream. And a good white-card score does
+# NOT rule out IR - white paper reflects IR roughly in proportion to visible, so
+# it balances fine on a NoIR module while plaster and wood still go pink. That
+# is why "distance 0.024" on a bulletin board sat alongside a salmon layout.
+traincam_awb_gains: ""
+# libcamera tuning. Must match the fitted module - this is where colour comes
+# from. The module fitted 2026-08-03 is IR-CUT (Arducam IMX219 standard), so it
+# takes the plain imx219.json. The two before it were NoIR and needed the _noir
+# variant; running _noir on this one costs the ct_curve and the AWB modes.
+#
+# MEASURE THIS, DO NOT EYEBALL IT. Shooting the same scene through both files
+# and judging by eye got it backwards here - a correct rendering looks green
+# straight after a magenta one, and a room with RGB lighting defeats the eye
+# completely. Shoot both back to back, then sample a genuinely neutral surface
+# (white trim, white paper) and take the ratios; neutral is R/G = B/G = 1.0.
+# Measured on white door trim WITH THE OLD NOIR MODULE: imx219.json 1.521/1.437,
+# imx219_noir.json 1.019/0.969. Those numbers belong to that module, not this
+# one - the whole point of an IR-cut sensor is that they invert.
+traincam_tuning_source: /usr/share/libcamera/ipa/rpi/vc4/imx219.json
+traincam_tuning_file: /etc/traincam/tuning.json
+# AGC shutter/gain ladder, walked in order as the scene darkens. The stock
+# ladder reaches 30000us before it raises gain past 4, which parks a moving
+# camera at 1/33s and smears everything. This one spends gain first: measured
+# 15821us at gain 6.0 where stock gave 29986us at gain 3.06, same brightness.
+# The last point reaches the 24fps frame-duration ceiling, so dark tunnels are
+# no worse than stock. Raise the shutter values if the layout is too dark;
+# lower them if motion still smears and you can accept the noise.
+traincam_agc_shutter: [100, 2500, 5000, 10000, 20000, 41000]
+traincam_agc_gain: [1.0, 2.0, 4.0, 6.0, 8.0, 8.0]
+# --bitrate caps the encoder, which rpicam-vid otherwise leaves at 0bps
+# (= its own choice, measured 5-7 Mbit/s). Sustained high-bitrate TX is the
+# documented trigger for the brcmfmac SDIO wedge that takes the WiFi down for
+# good (see docs/NETWORK.md), and the Zero 2 W is 2.4GHz-only, so a busy hall
+# leaves no room to escape. Raise it if the picture is too soft and the radio
+# proves stable; the trade is reliability, not just airtime.
+# --mode pins the sensor mode. Without it libcamera matches our 16:9 output and
+# picks the imx219's 1920x1080 mode, which is an unbinned CROP - measured at
+# left 688, top 700 of the 3280x2464 array, so 58% of the sensor width. That
+# cost the whole left wall and the doorway in a side-by-side. 1640x1232 is the
+# full-FOV 2x2-binned mode: the entire lens view, and 4x the photons per output
+# pixel. The light matters as much as the framing - measured at 33-41 lux (a lit
+# room) the AGC was already pegged at its ceiling, 66502us and gain 5.95, and a
+# layout is darker than that. Still 1.28x supersampled into 720p. Costs a little
+# sharpness against the crop; drop this flag to trade the room back for it.
+traincam_extra_opts: "--denoise cdn_off --saturation 1.1 --bitrate 2500000 --mode 1640:1232"
 
 # Optional tuning (uncomment to override):
 # traincam_keyframe_interval: 48      # Defaults based on LATENCY_MODE
-# traincam_qp: 32                     # Lower = higher quality
 
+# Keyframe interval, NOT stream latency - the names predate the WebRTC path and
+# are misleading. GOP length does not change end-to-end latency for a live WHEP
+# stream; it changes time-to-first-picture on join, and how long a lost packet
+# stays visible as corruption. What it very much does change is quality, because
+# keyframes are expensive.
+#
+# Measured on the live stream at the 2500kbps cap (ffprobe, 8s windows):
+#   intra  6 (ultra_plus): 38.2% of ALL bits went to keyframes, P avg  9756 B
+#   intra 24 (low):        17.3%,                               P avg 11239 B
+#   intra 48:              11.5%,                               P avg 11810 B
+# So `low` buys ~15% more bits per P-frame - i.e. actual picture detail - for
+# free, at the cost of up to 1s to first picture instead of 0.25s.
+#
+# Not going further to 48: MediaMTX passes through an already-encoded stream, so
+# it cannot ask rpicam-vid for a keyframe on demand (no PLI/FIR path). That makes
+# GOP length the *only* thing bounding how long a dropped packet stays smeared on
+# screen, and a hall full of phones is a lossy place. 1s is the balance.
 # Latency mode: low (~1s GOP), ultra (~0.5s), ultra_plus (~0.25s)
-LATENCY_MODE: ultra_plus
+LATENCY_MODE: low
 
 # ─────────────────────────────────────────────────────────────
 # NETWORK / PORTS
@@ -43,3 +147,26 @@ traincam_log_dir: /var/log/traincam
 # ─────────────────────────────────────────────────────────────
 mediamtx_version: "v1.15.2"
 mediamtx_download_url: "https://github.com/bluenviron/mediamtx/releases/download/{{ mediamtx_version }}/mediamtx_{{ mediamtx_version }}_linux_arm64.tar.gz"
+mediamtx_checksum: "sha256:c9ad9ae5f93c1a84a3a52055f630687498b98566e735b5177ed604fefa7072b5"
+
+# ─────────────────────────────────────────────────────────────
+# UNATTENDED OPERATION
+# ─────────────────────────────────────────────────────────────
+# The bcm2835 watchdog hardware maxes out at 15s; systemd pets it at half
+# this interval. Raising it past 15 silently disables the watchdog.
+traincam_watchdog_sec: 14
+# Persistent journal, bounded so an all-day run can't fill the card.
+traincam_journal_max_use: 64M
+
+# Network watchdog. The hardware watchdog above only catches a dead kernel.
+# When the BCM43430's SDIO bus wedges the kernel stays perfectly healthy and
+# keeps petting /dev/watchdog0 while the camera is unreachable for good, so it
+# needs its own detector. threshold x interval = how long the network must be
+# gone before rebooting; keep it minutes, not seconds, so a brief AP blip at
+# the show can't reboot every camera in the hall.
+traincam_netwatch_interval_sec: 30
+traincam_netwatch_threshold: 10
+# SDIO clock for the WiFi chip, in MHz. Default is 50 (measured). Halving it
+# widens setup/hold margins, which is the cheapest defence against the -110
+# bus timeouts, and costs nothing at our bitrate.
+traincam_sdio_overclock: 25

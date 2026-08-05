@@ -10,7 +10,7 @@ assignees: ''
 A clear description of what's wrong.
 
 ## Hardware
-- [ ] Raspberry Pi Zero W
+- [ ] Raspberry Pi Zero 2 W
 - [ ] Raspberry Pi Zero 2 W
 - [ ] ESP32-CAM
 - [ ] Other: ___

@@ -2,6 +2,5 @@
 #define APP_HTTPD_H
 
 void startCameraServer();
-void setupLedFlash(int pin);
 
 #endif
