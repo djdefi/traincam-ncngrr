@@ -1,5 +1,6 @@
 // Single-servo hardware test for Inventr.io HERO (Arduino Uno compatible).
 // Signal on D9, servo power from HERO 5V/GND.
+// D9 confirmed by test to drive the PAN axis (left/right).
 // Runs one conservative sweep, then leaves the servo centered.
 
 #include <Servo.h>
