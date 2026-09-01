@@ -21,32 +21,37 @@ const int TILT_PIN = 10;
 const int CENTER = 90;
 const int MIN_ANGLE = 30;
 const int MAX_ANGLE = 150;
-const int STEP_DELAY_MS = 15;
+const unsigned long STEP_INTERVAL_MS = 15;  // pace of one-degree steps
 
 Servo pan;
 Servo tilt;
 int panAngle = CENTER;
 int tiltAngle = CENTER;
+int panTarget = CENTER;
+int tiltTarget = CENTER;
+unsigned long lastStep = 0;
 
-void moveTo(Servo &s, int &angle, int target) {
-  target = constrain(target, MIN_ANGLE, MAX_ANGLE);
-  int step = (target > angle) ? 1 : -1;
-  while (angle != target) {
-    angle += step;
-    s.write(angle);
-    delay(STEP_DELAY_MS);
+// One step toward the target. Never blocks, so a newer target set by the next
+// serial command takes effect immediately instead of queueing behind this move.
+void stepAxis(Servo &s, int &angle, int target) {
+  target = constrain(target, MIN_ANGLE, MAX_ANGLE);  // belt and braces
+  if (angle == target) {
+    return;
   }
+  angle += (target > angle) ? 1 : -1;
+  s.write(angle);
 }
 
 void report() {
   Serial.print("P:");
-  Serial.print(panAngle);
+  Serial.print(panTarget);
   Serial.print(" T:");
-  Serial.println(tiltAngle);
+  Serial.println(tiltTarget);
 }
 
 void setup() {
   Serial.begin(115200);
+  Serial.setTimeout(50);  // parseInt shouldn't stall the step loop
   pan.attach(PAN_PIN);
   tilt.attach(TILT_PIN);
   pan.write(panAngle);
@@ -55,19 +60,25 @@ void setup() {
   report();
 }
 
-void loop() {
+void handleSerial() {
   if (!Serial.available()) {
     return;
   }
 
   char cmd = Serial.read();
-  if (cmd == 'p') {
-    moveTo(pan, panAngle, Serial.parseInt());
-  } else if (cmd == 't') {
-    moveTo(tilt, tiltAngle, Serial.parseInt());
+  if (cmd == 'p' || cmd == 't') {
+    // Read once into a local: constrain() is a macro and would evaluate a
+    // Serial.parseInt() argument several times, draining the buffer to 0.
+    int angle = Serial.parseInt();
+    angle = constrain(angle, MIN_ANGLE, MAX_ANGLE);
+    if (cmd == 'p') {
+      panTarget = angle;
+    } else {
+      tiltTarget = angle;
+    }
   } else if (cmd == 'c') {
-    moveTo(pan, panAngle, CENTER);
-    moveTo(tilt, tiltAngle, CENTER);
+    panTarget = CENTER;
+    tiltTarget = CENTER;
   } else if (cmd == '?') {
     // fall through to report
   } else {
@@ -75,4 +86,14 @@ void loop() {
   }
 
   report();
+}
+
+void loop() {
+  handleSerial();
+
+  if (millis() - lastStep >= STEP_INTERVAL_MS) {
+    lastStep = millis();
+    stepAxis(pan, panAngle, panTarget);
+    stepAxis(tilt, tiltAngle, tiltTarget);
+  }
 }
