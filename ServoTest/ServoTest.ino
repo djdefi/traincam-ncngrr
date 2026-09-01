@@ -1,27 +1,31 @@
-// Single-servo hardware test for Inventr.io HERO (Arduino Uno compatible).
-// Signal on D9, servo power from HERO 5V/GND.
-// D9 confirmed by test to drive the PAN axis (left/right).
-// Runs one conservative sweep, then leaves the servo centered.
+// Two-servo hardware test for Inventr.io HERO (Arduino Uno compatible).
+// Servo power from HERO 5V/GND.
+//   D9  = PAN  (confirmed left/right by test)
+//   D10 = TILT (assumed - this test confirms it)
+// Moves one axis at a time, then leaves both centered.
 
 #include <Servo.h>
 
-const int SERVO_PIN = 9;
+const int PAN_PIN = 9;
+const int TILT_PIN = 10;
 const int CENTER = 90;
 const int STEP_DELAY_MS = 20;
 
-Servo servo;
-int currentAngle = CENTER;
+Servo pan;
+Servo tilt;
 
-void moveTo(int target) {
-  Serial.print("Requested: ");
+void sweep(Servo &s, int &angle, const char *name, int target) {
+  Serial.print(name);
+  Serial.print(" requested: ");
   Serial.println(target);
 
-  int step = (target > currentAngle) ? 1 : -1;
-  while (currentAngle != target) {
-    currentAngle += step;
-    servo.write(currentAngle);
-    Serial.print("Current: ");
-    Serial.println(currentAngle);
+  int step = (target > angle) ? 1 : -1;
+  while (angle != target) {
+    angle += step;
+    s.write(angle);
+    Serial.print(name);
+    Serial.print(" current: ");
+    Serial.println(angle);
     delay(STEP_DELAY_MS);
   }
 }
@@ -29,20 +33,34 @@ void moveTo(int target) {
 void setup() {
   Serial.begin(115200);
 
-  servo.attach(SERVO_PIN);
-  servo.write(CENTER);
-  Serial.println("Centered at 90, holding 2s...");
+  int panAngle = CENTER;
+  int tiltAngle = CENTER;
+
+  pan.attach(PAN_PIN);
+  tilt.attach(TILT_PIN);
+  pan.write(CENTER);
+  tilt.write(CENTER);
+  Serial.println("Both centered at 90, holding 2s...");
   delay(2000);
 
-  moveTo(70);
+  Serial.println("--- PAN (D9) ---");
+  sweep(pan, panAngle, "PAN", 70);
   delay(500);
-  moveTo(90);
+  sweep(pan, panAngle, "PAN", 110);
   delay(500);
-  moveTo(110);
-  delay(500);
-  moveTo(90);
+  sweep(pan, panAngle, "PAN", 90);
 
-  Serial.println("Test complete. Servo centered at 90.");
+  delay(1000);
+
+  // Narrower range on the untested axis: tilt binds sooner and fights gravity.
+  Serial.println("--- D10 (tilt?) ---");
+  sweep(tilt, tiltAngle, "D10", 80);
+  delay(500);
+  sweep(tilt, tiltAngle, "D10", 100);
+  delay(500);
+  sweep(tilt, tiltAngle, "D10", 90);
+
+  Serial.println("Test complete. Both centered at 90.");
 }
 
 void loop() {
