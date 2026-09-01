@@ -1,7 +1,7 @@
 // Two-servo hardware test for Inventr.io HERO (Arduino Uno compatible).
 // Servo power from HERO 5V/GND.
 //   D9  = PAN  (confirmed left/right by test)
-//   D10 = TILT (assumed - this test confirms it)
+//   D10 = TILT (confirmed up/down by test)
 // Moves one axis at a time with long still gaps between, so any
 // unexpected movement on the idle axis is easy to spot.
 

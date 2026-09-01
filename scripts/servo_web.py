@@ -53,7 +53,7 @@ PAGE = """<!doctype html>
 </div>
 
 <div class="axis">
-  <label>TILT? (D10) <span class="val" id="tval">90</span></label>
+  <label>TILT (D10) <span class="val" id="tval">90</span></label>
   <input type="range" id="tilt" min="MINA" max="MAXA" value="90">
 </div>
 

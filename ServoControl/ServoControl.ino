@@ -3,7 +3,7 @@
 // commands over USB serial.
 //
 //   D9  = PAN  (confirmed left/right by test)
-//   D10 = TILT (assumed)
+//   D10 = TILT (confirmed up/down by test)
 //
 // Commands, one per line, 115200 baud:
 //   p<angle>  move pan to angle      e.g. p110
