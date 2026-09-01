@@ -13,7 +13,8 @@ Then open http://localhost:8090
 import argparse
 import glob
 import http.server
-import json
+import os
+import termios
 import threading
 import time
 import urllib.parse
@@ -25,6 +26,7 @@ MAX_ANGLE = 150
 
 lock = threading.Lock()
 board = None
+board_port = None
 
 PAGE = """<!doctype html>
 <html>
@@ -106,18 +108,62 @@ async function center() {
 """
 
 
+def connect(port=None):
+    """Open the serial port, waiting out the board's reset-on-open."""
+    global board, board_port
+
+    if board is not None:
+        try:
+            board.close()
+        except Exception:
+            pass
+        board = None
+
+    if port:
+        board_port = port
+    if not board_port or not os.path.exists(board_port):
+        board_port = autodetect()
+
+    board = serial.Serial(board_port, 115200, timeout=1)
+    time.sleep(2)  # board resets when the port opens
+    board.reset_input_buffer()
+    return board_port
+
+
+def _exchange(cmd):
+    board.reset_input_buffer()
+    board.write(cmd.encode())
+    board.flush()
+    deadline = time.time() + 3
+    while time.time() < deadline:
+        line = board.readline().decode("utf-8", "replace").strip()
+        if line.startswith("P:"):
+            return line
+    return "no response from board"
+
+
 def send(cmd):
-    """Write one command and return the board's position report."""
+    """Write one command and return the board's position report.
+
+    Unplugging the board invalidates the file descriptor, so on an I/O error
+    reopen the port once and retry. Note the reopen resets the board, which
+    returns both servos to center.
+    """
     with lock:
-        board.reset_input_buffer()
-        board.write(cmd.encode())
-        board.flush()
-        deadline = time.time() + 3
-        while time.time() < deadline:
-            line = board.readline().decode("utf-8", "replace").strip()
-            if line.startswith("P:"):
-                return line
-        return "no response from board"
+        try:
+            return _exchange(cmd)
+        except (serial.SerialException, termios.error, OSError):
+            pass
+
+        try:
+            connect()
+        except Exception as e:
+            return f"board disconnected ({e})"
+
+        try:
+            return f"{_exchange(cmd)} (reconnected, servos re-centered)"
+        except Exception as e:
+            return f"board disconnected ({e})"
 
 
 class Handler(http.server.BaseHTTPRequestHandler):
@@ -156,22 +202,20 @@ class Handler(http.server.BaseHTTPRequestHandler):
 def autodetect():
     ports = glob.glob("/dev/cu.usbserial-*") + glob.glob("/dev/ttyUSB*")
     if not ports:
-        raise SystemExit("No USB serial board found. Pass --port explicitly.")
+        raise RuntimeError("no USB serial board found")
     return ports[0]
 
 
 def main():
-    global board
-
     ap = argparse.ArgumentParser()
     ap.add_argument("--port", help="serial port (autodetected if omitted)")
     ap.add_argument("--http-port", type=int, default=8090)
     args = ap.parse_args()
 
-    port = args.port or autodetect()
-    board = serial.Serial(port, 115200, timeout=1)
-    time.sleep(2)  # board resets when the port opens
-    board.reset_input_buffer()
+    try:
+        port = connect(args.port)
+    except RuntimeError as e:
+        raise SystemExit(f"{e}. Plug the board in, or pass --port explicitly.")
 
     print(f"Board:  {port}")
     print(f"Open:   http://localhost:{args.http_port}")
