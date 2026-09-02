@@ -21,8 +21,10 @@ import urllib.parse
 
 import serial
 
-MIN_ANGLE = 30
-MAX_ANGLE = 150
+# Measured on the mount: tilt binds around 150, so its ceiling sits 5 degrees
+# below that. Pan reached both ends without binding. Keep in step with the
+# matching constants in ServoControl/ServoControl.ino.
+LIMITS = {"p": (10, 170), "t": (10, 145)}
 
 lock = threading.Lock()
 board = None
@@ -51,12 +53,12 @@ PAGE = """<!doctype html>
 
 <div class="axis">
   <label>PAN (D9) <span class="val" id="pval">90</span></label>
-  <input type="range" id="pan" min="MINA" max="MAXA" value="90">
+  <input type="range" id="pan" min="PMIN" max="PMAX" value="90">
 </div>
 
 <div class="axis">
   <label>TILT (D10) <span class="val" id="tval">90</span></label>
-  <input type="range" id="tilt" min="MINA" max="MAXA" value="90">
+  <input type="range" id="tilt" min="TMIN" max="TMAX" value="90">
 </div>
 
 <button onclick="center()">Center both</button>
@@ -172,15 +174,20 @@ class Handler(http.server.BaseHTTPRequestHandler):
         query = urllib.parse.parse_qs(url.query)
 
         if url.path == "/":
-            body = PAGE.replace("MINA", str(MIN_ANGLE)).replace("MAXA", str(MAX_ANGLE))
+            body = (PAGE
+                    .replace("PMIN", str(LIMITS["p"][0]))
+                    .replace("PMAX", str(LIMITS["p"][1]))
+                    .replace("TMIN", str(LIMITS["t"][0]))
+                    .replace("TMAX", str(LIMITS["t"][1])))
             self.respond(body, "text/html")
         elif url.path == "/set":
             axis = query.get("axis", ["p"])[0]
             angle = int(query.get("angle", ["90"])[0])
-            if axis not in ("p", "t"):
+            if axis not in LIMITS:
                 self.respond("bad axis", "text/plain", code=400)
                 return
-            angle = max(MIN_ANGLE, min(MAX_ANGLE, angle))
+            lo, hi = LIMITS[axis]
+            angle = max(lo, min(hi, angle))
             self.respond(send(f"{axis}{angle}\n"), "text/plain")
         elif url.path == "/center":
             self.respond(send("c\n"), "text/plain")

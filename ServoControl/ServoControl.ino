@@ -11,16 +11,19 @@
 //   c         center both
 //   ?         report current angles
 //
-// Angles are clamped to MIN_ANGLE..MAX_ANGLE so a typo can't drive a servo
-// into its hard stop and stall it.
+// Angles are clamped per axis so a typo can't drive a servo into its hard
+// stop and stall it. Measured on the mount: tilt binds around 150, so its
+// ceiling sits 5 degrees below that. Pan reached 10 and 170 without binding.
 
 #include <Servo.h>
 
 const int PAN_PIN = 9;
 const int TILT_PIN = 10;
 const int CENTER = 90;
-const int MIN_ANGLE = 30;
-const int MAX_ANGLE = 150;
+const int PAN_MIN = 10;
+const int PAN_MAX = 170;
+const int TILT_MIN = 10;
+const int TILT_MAX = 145;
 const unsigned long STEP_INTERVAL_MS = 15;  // pace of one-degree steps
 
 Servo pan;
@@ -33,8 +36,8 @@ unsigned long lastStep = 0;
 
 // One step toward the target. Never blocks, so a newer target set by the next
 // serial command takes effect immediately instead of queueing behind this move.
-void stepAxis(Servo &s, int &angle, int target) {
-  target = constrain(target, MIN_ANGLE, MAX_ANGLE);  // belt and braces
+void stepAxis(Servo &s, int &angle, int target, int lo, int hi) {
+  target = constrain(target, lo, hi);  // belt and braces
   if (angle == target) {
     return;
   }
@@ -70,11 +73,10 @@ void handleSerial() {
     // Read once into a local: constrain() is a macro and would evaluate a
     // Serial.parseInt() argument several times, draining the buffer to 0.
     int angle = Serial.parseInt();
-    angle = constrain(angle, MIN_ANGLE, MAX_ANGLE);
     if (cmd == 'p') {
-      panTarget = angle;
+      panTarget = constrain(angle, PAN_MIN, PAN_MAX);
     } else {
-      tiltTarget = angle;
+      tiltTarget = constrain(angle, TILT_MIN, TILT_MAX);
     }
   } else if (cmd == 'c') {
     panTarget = CENTER;
@@ -93,7 +95,7 @@ void loop() {
 
   if (millis() - lastStep >= STEP_INTERVAL_MS) {
     lastStep = millis();
-    stepAxis(pan, panAngle, panTarget);
-    stepAxis(tilt, tiltAngle, tiltTarget);
+    stepAxis(pan, panAngle, panTarget, PAN_MIN, PAN_MAX);
+    stepAxis(tilt, tiltAngle, tiltTarget, TILT_MIN, TILT_MAX);
   }
 }
