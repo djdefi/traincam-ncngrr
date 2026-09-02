@@ -14,6 +14,10 @@
 // Angles are clamped per axis so a typo can't drive a servo into its hard
 // stop and stall it. Measured on the mount: tilt binds around 150, so its
 // ceiling sits 5 degrees below that. Pan reached 10 and 170 without binding.
+//
+// Each axis is detached after IDLE_DETACH_MS without movement, which stops
+// the holding buzz and drops current draw. A detached axis is limp and can
+// sag under load; it re-attaches on the next command.
 
 #include <Servo.h>
 
@@ -24,7 +28,8 @@ const int PAN_MIN = 10;
 const int PAN_MAX = 170;
 const int TILT_MIN = 10;
 const int TILT_MAX = 145;
-const unsigned long STEP_INTERVAL_MS = 15;  // pace of one-degree steps
+const unsigned long STEP_INTERVAL_MS = 15;    // pace of one-degree steps
+const unsigned long IDLE_DETACH_MS = 3000;    // quiet time before going limp
 
 Servo pan;
 Servo tilt;
@@ -33,16 +38,33 @@ int tiltAngle = CENTER;
 int panTarget = CENTER;
 int tiltTarget = CENTER;
 unsigned long lastStep = 0;
+unsigned long panIdleSince = 0;
+unsigned long tiltIdleSince = 0;
 
 // One step toward the target. Never blocks, so a newer target set by the next
 // serial command takes effect immediately instead of queueing behind this move.
-void stepAxis(Servo &s, int &angle, int target, int lo, int hi) {
+void stepAxis(Servo &s, int pin, int &angle, int target, int lo, int hi) {
   target = constrain(target, lo, hi);  // belt and braces
   if (angle == target) {
     return;
   }
+  if (!s.attached()) {
+    s.attach(pin);
+    s.write(angle);  // resume from where it actually is
+  }
   angle += (target > angle) ? 1 : -1;
   s.write(angle);
+}
+
+// Cut the drive signal once an axis has sat still long enough.
+void idleDetach(Servo &s, int angle, int target, unsigned long &idleSince) {
+  if (angle != target) {
+    idleSince = millis();
+    return;
+  }
+  if (s.attached() && millis() - idleSince >= IDLE_DETACH_MS) {
+    s.detach();
+  }
 }
 
 void report() {
@@ -59,6 +81,8 @@ void setup() {
   tilt.attach(TILT_PIN);
   pan.write(panAngle);
   tilt.write(tiltAngle);
+  panIdleSince = millis();
+  tiltIdleSince = millis();
   Serial.println("READY");
   report();
 }
@@ -95,7 +119,9 @@ void loop() {
 
   if (millis() - lastStep >= STEP_INTERVAL_MS) {
     lastStep = millis();
-    stepAxis(pan, panAngle, panTarget, PAN_MIN, PAN_MAX);
-    stepAxis(tilt, tiltAngle, tiltTarget, TILT_MIN, TILT_MAX);
+    stepAxis(pan, PAN_PIN, panAngle, panTarget, PAN_MIN, PAN_MAX);
+    stepAxis(tilt, TILT_PIN, tiltAngle, tiltTarget, TILT_MIN, TILT_MAX);
+    idleDetach(pan, panAngle, panTarget, panIdleSince);
+    idleDetach(tilt, tiltAngle, tiltTarget, tiltIdleSince);
   }
 }
