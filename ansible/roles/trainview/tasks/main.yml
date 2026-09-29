@@ -1,0 +1,327 @@
+---
+- name: Refresh base package index
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+  when: trainview_update_apt_cache | bool
+
+- name: Check for Raspberry Pi desktop compositor
+  ansible.builtin.command: apt-cache show labwc
+  register: trainview_labwc
+  changed_when: false
+  failed_when: false
+
+- name: Install Raspberry Pi archive key for generic ARM64 VM
+  ansible.builtin.get_url:
+    url: https://archive.raspberrypi.com/debian/raspberrypi.gpg.key
+    dest: /etc/apt/keyrings/raspberrypi.asc
+    owner: root
+    group: root
+    mode: "0644"
+  when: trainview_labwc.rc != 0
+
+- name: Add Raspberry Pi desktop packages for generic ARM64 VM
+  ansible.builtin.apt_repository:
+    repo: "deb [arch=arm64 signed-by=/etc/apt/keyrings/raspberrypi.asc] https://archive.raspberrypi.com/debian/ bookworm main"
+    filename: raspberrypi
+    state: present
+    update_cache: true
+  when: trainview_labwc.rc != 0
+
+- name: Install kiosk runtime
+  ansible.builtin.apt:
+    name:
+      - chromium
+      - curl
+      - ffmpeg
+      - grim
+      - kanshi
+      - labwc
+      - lightdm
+      - network-manager
+      - python3
+      - wlr-randr
+      - xdg-desktop-portal
+      - xdg-desktop-portal-wlr
+    state: present
+    update_cache: false
+
+- name: Install VM kernel with virtio GPU support
+  ansible.builtin.apt:
+    name: linux-image-arm64
+    state: present
+  when:
+    - not (traincam_image_build | default(false) | bool)
+    - ansible_virtualization_role == "guest"
+
+- name: Remove VM cloud kernel without virtio GPU support
+  ansible.builtin.apt:
+    name:
+      - linux-image-cloud-arm64
+      - "linux-image-{{ ansible_kernel }}"
+    state: absent
+    purge: true
+  when:
+    - not (traincam_image_build | default(false) | bool)
+    - ansible_virtualization_role == "guest"
+    - ansible_kernel is search("cloud-arm64$")
+
+- name: Ensure kiosk user exists
+  ansible.builtin.user:
+    name: "{{ trainview_user }}"
+    groups: audio,render,video
+    append: true
+    create_home: true
+
+- name: Create kiosk directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ trainview_user }}"
+    group: "{{ trainview_user }}"
+    mode: "0755"
+  loop:
+    - "{{ trainview_www }}"
+    - "{{ trainview_home }}/.config/kanshi"
+    - "{{ trainview_home }}/.config/labwc"
+    - "{{ trainview_home }}/.config/systemd/user"
+    - "{{ trainview_home }}/.config/systemd/user/default.target.wants"
+
+- name: Deploy shared camera viewer
+  ansible.builtin.template:
+    src: "{{ playbook_dir }}/ansible/roles/traincam/templates/viewer.html.j2"
+    dest: "{{ trainview_www }}/viewer.html"
+    owner: "{{ trainview_user }}"
+    group: "{{ trainview_user }}"
+    mode: "0644"
+
+- name: Deploy kiosk page
+  ansible.builtin.template:
+    src: kiosk.html.j2
+    dest: "{{ trainview_www }}/kiosk.html"
+    owner: "{{ trainview_user }}"
+    group: "{{ trainview_user }}"
+    mode: "0644"
+
+- name: Deploy ESP32 stream relay
+  ansible.builtin.template:
+    src: esp32-relay.py.j2
+    dest: "{{ trainview_www }}/esp32-relay.py"
+    owner: "{{ trainview_user }}"
+    group: "{{ trainview_user }}"
+    mode: "0755"
+
+- name: Deploy local kiosk server and offline visitor assets
+  ansible.builtin.copy:
+    src: "{{ item.src }}"
+    dest: "{{ trainview_www }}/{{ item.dest }}"
+    owner: "{{ trainview_user }}"
+    group: "{{ trainview_user }}"
+    mode: "0644"
+    directory_mode: "0755"
+  loop:
+    - { src: kiosk-server.py, dest: kiosk-server.py }
+    - { src: visitor/, dest: visitor/ }
+
+- name: Deploy USB camera stream relay
+  ansible.builtin.template:
+    src: usb-relay.py.j2
+    dest: "{{ trainview_www }}/usb-relay.py"
+    owner: "{{ trainview_user }}"
+    group: "{{ trainview_user }}"
+    mode: "0755"
+
+- name: Find Chromium executable
+  ansible.builtin.stat:
+    path: /usr/bin/chromium-browser
+  register: trainview_chromium_browser
+
+- name: Set Chromium executable
+  ansible.builtin.set_fact:
+    trainview_chromium: "{{ '/usr/bin/chromium-browser' if trainview_chromium_browser.stat.exists else '/usr/bin/chromium' }}"
+
+- name: Deploy kiosk user services
+  ansible.builtin.template:
+    src: "{{ item }}.j2"
+    dest: "{{ trainview_home }}/.config/systemd/user/{{ item }}"
+    owner: "{{ trainview_user }}"
+    group: "{{ trainview_user }}"
+    mode: "0644"
+  loop:
+    - traincam-esp32-relay.service
+    - traincam-usb-relay.service
+    - traincam-kiosk-www.service
+    - traincam-kiosk.service
+
+- name: Enable local kiosk web server
+  ansible.builtin.file:
+    src: ../traincam-kiosk-www.service
+    dest: "{{ trainview_home }}/.config/systemd/user/default.target.wants/traincam-kiosk-www.service"
+    state: link
+    owner: "{{ trainview_user }}"
+    group: "{{ trainview_user }}"
+
+- name: Start kiosk from labwc session
+  ansible.builtin.copy:
+    dest: "{{ trainview_home }}/.config/labwc/autostart"
+    owner: "{{ trainview_user }}"
+    group: "{{ trainview_user }}"
+    mode: "0755"
+    content: |
+      # Native compositor hook: the Wayland display exists before this runs.
+      systemctl --user daemon-reload
+      systemctl --user restart traincam-kiosk.service &
+
+- name: Pin one kiosk window to each HDMI output
+  ansible.builtin.template:
+    src: labwc-rc.xml.j2
+    dest: "{{ trainview_home }}/.config/labwc/rc.xml"
+    owner: "{{ trainview_user }}"
+    group: "{{ trainview_user }}"
+    mode: "0644"
+
+- name: Remove obsolete desktop autostarts
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - "{{ trainview_home }}/.config/autostart/CAMVIEW.desktop"
+    - "{{ trainview_home }}/.config/autostart/traincam-kiosk.desktop"
+
+- name: Arrange independent physical kiosk outputs
+  ansible.builtin.template:
+    src: kanshi.conf.j2
+    dest: "{{ trainview_home }}/.config/kanshi/config"
+    owner: "{{ trainview_user }}"
+    group: "{{ trainview_user }}"
+    mode: "0644"
+
+- name: Create LightDM configuration directory
+  ansible.builtin.file:
+    path: /etc/lightdm/lightdm.conf.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Configure desktop autologin
+  ansible.builtin.copy:
+    dest: /etc/lightdm/lightdm.conf.d/50-trainview.conf
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      [Seat:*]
+      autologin-user={{ trainview_user }}
+      autologin-user-timeout=0
+      autologin-session=labwc
+      user-session=labwc
+
+- name: Check for Raspberry Pi desktop session wrapper
+  ansible.builtin.stat:
+    path: /usr/bin/labwc-pi
+  register: trainview_labwc_pi
+
+- name: Override Raspberry Pi OS desktop session defaults
+  ansible.builtin.lineinfile:
+    path: /etc/lightdm/lightdm.conf
+    regexp: "^{{ item }}="
+    line: "{{ item }}=labwc"
+  loop:
+    - autologin-session
+    - user-session
+  when: trainview_labwc_pi.stat.exists
+
+- name: Disable kiosk WiFi power saving
+  ansible.builtin.copy:
+    dest: /etc/NetworkManager/conf.d/20-trainview-powersave.conf
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      [connection]
+      wifi.powersave=2
+
+- name: Boot into the graphical kiosk
+  ansible.builtin.file:
+    src: /lib/systemd/system/graphical.target
+    dest: /etc/systemd/system/default.target
+    state: link
+    force: true
+
+- name: Enable display manager
+  ansible.builtin.systemd:
+    name: lightdm.service
+    enabled: true
+  when: not (traincam_image_build | default(false) | bool)
+
+- name: Read installed services
+  ansible.builtin.service_facts:
+
+- name: Mask kiosk-irrelevant boot services
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    enabled: false
+    masked: true
+    state: stopped
+  loop:
+    - cups.service
+    - cups-browsed.service
+    - cups.path
+    - cups.socket
+    - e2scrub_reap.service
+    - ModemManager.service
+    - packagekit.service
+    - rpc-statd-notify.service
+    - rpi-eeprom-update.service
+    - udisks2.service
+    - wayvnc-control.service
+    - wayvnc.service
+  when:
+    - not (traincam_image_build | default(false) | bool)
+    - item in ansible_facts.services
+
+- name: Stop waiting for network before showing the kiosk
+  ansible.builtin.systemd:
+    name: NetworkManager-wait-online.service
+    enabled: false
+    state: stopped
+  when:
+    - not (traincam_image_build | default(false) | bool)
+    - "'NetworkManager-wait-online.service' in ansible_facts.services"
+
+- name: Check for Raspberry Pi configuration utility
+  ansible.builtin.stat:
+    path: /usr/bin/raspi-config
+  register: trainview_raspi_config
+
+- name: Disable Raspberry Pi screen blanking
+  ansible.builtin.command: raspi-config nonint do_blanking 1
+  changed_when: false
+  when:
+    - not (traincam_image_build | default(false) | bool)
+    - trainview_raspi_config.stat.exists
+
+- name: Read kiosk user ID
+  ansible.builtin.command: "id -u {{ trainview_user }}"
+  register: trainview_uid
+  changed_when: false
+  when: not (traincam_image_build | default(false) | bool)
+
+- name: Apply kiosk runtime changes
+  become: true
+  become_user: "{{ trainview_user }}"
+  environment:
+    XDG_RUNTIME_DIR: "/run/user/{{ trainview_uid.stdout }}"
+    DBUS_SESSION_BUS_ADDRESS: "unix:path=/run/user/{{ trainview_uid.stdout }}/bus"
+  ansible.builtin.systemd_service:
+    scope: user
+    daemon_reload: true
+    name: "{{ item }}"
+    state: restarted
+  loop:
+    - traincam-kiosk-www.service
+    - traincam-esp32-relay.service
+    - traincam-usb-relay.service
+    - traincam-kiosk.service
+  when: not (traincam_image_build | default(false) | bool)

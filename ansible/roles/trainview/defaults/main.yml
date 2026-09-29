@@ -1,0 +1,12 @@
+---
+trainview_user: train
+trainview_camera: traincam1.local
+trainview_esp32_camera: traincam-908fe2.local
+trainview_local_port: 8081
+trainview_esp32_relay_port: 8082
+trainview_usb_relay_port: 8083
+trainview_usb_camera: /dev/video0
+trainview_whep_port: 8889
+trainview_home: "/home/{{ trainview_user }}"
+trainview_www: "{{ trainview_home }}/traincam-kiosk"
+trainview_update_apt_cache: false

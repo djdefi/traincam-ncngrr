@@ -20,7 +20,10 @@ trap 'rm -rf "$TEMP_DIR"' EXIT
 
 # Render the template's script block: strip HTML, substitute the one Jinja expression.
 sed -n '/^<script>/,/^<\/script>/p' "$TEMPLATE" \
-  | sed -e '1d' -e '$d' -e 's/{{[^}]*}}/8889/g' > "$TEMP_DIR/viewer.js"
+  | sed -e '1d' -e '$d' \
+        -e 's/{{ traincam_viewer_port[^}]*}}/8080/g' \
+        -e 's/{{ traincam_webrtc_port[^}]*}}/8889/g' \
+        -e 's/{{[^}]*}}/8889/g' > "$TEMP_DIR/viewer.js"
 
 if [[ ! -s "$TEMP_DIR/viewer.js" ]]; then
   echo "✗ could not extract script block from $TEMPLATE"
@@ -50,7 +53,7 @@ class FakePC {
 const els = {};
 const makeEl = () => ({
   textContent: '', disabled: false, checked: true, srcObject: null, style: {}, hidden: false,
-  classList: { add() {}, remove() {} },
+  classList: { add() {}, remove() {}, toggle() {} },
   handlers: {},
   addEventListener(type, fn) { (this.handlers[type] ||= []).push(fn); },
   fire(type) { (this.handlers[type] || []).forEach(fn => fn()); },
@@ -85,7 +88,7 @@ let pendingReconnect = null;
 // is now jittered and so cannot be matched by a fixed value.
 const delays = [];
 globalThis.setTimeout = (fn, ms) => {
-  if (ms !== 600 && ms !== 2000) { reconnects++; pendingReconnect = fn; delays.push(ms); }
+  if (ms !== 600 && ms !== 2000 && fn.name !== 'connectionTimeout') { reconnects++; pendingReconnect = fn; delays.push(ms); }
   return { ms };
 };
 globalThis.clearTimeout = () => {};
@@ -226,6 +229,31 @@ vm.runInThisContext(fs.readFileSync(process.argv[2], 'utf8'));
   assert.strictEqual(offline.hidden, false,
     'losing the stream must re-show the offline card');
   process.stdout.write('✓ losing the stream re-shows the offline card\n');
+
+  // 12. The operational clock must distinguish the camera from this browser.
+  //     The kiosk serves a cached viewer from localhost, so derive camera /status
+  //     from whepBase rather than window.location.
+  assert.strictEqual(CAMERA_STATUS, 'http://traincam1.local:8080/status',
+    'camera status must follow the WHEP host, not the kiosk page origin');
+  assert.strictEqual(formatDuration(90061), '25:01:01',
+    'uptime must not wrap after 24 hours');
+  noteCameraStatus({ uptime_s: 123, battery_mv: 3712, temperature_c: 58.4 });
+  assert.strictEqual(cameraUptime, 123, 'camera uptime must use the server status value');
+  assert.strictEqual(cameraPowerMv, 3712, 'camera power voltage must use status telemetry');
+  assert.strictEqual(cameraTemperatureC, 58.4, 'camera temperature must use status telemetry');
+  noteCameraStatus({ uptime_s: 124 });
+  assert.strictEqual(cameraPowerMv, null, 'missing power telemetry must hide rather than show stale data');
+  assert.strictEqual(cameraTemperatureC, null, 'missing temperature telemetry must hide rather than show stale data');
+  lastFrameAt = Date.now();
+  assert.deepStrictEqual(healthState(Date.now()), ['health-ok', '▶', 'LIVE'],
+    'recent frames and a responding camera must read LIVE without relying on color');
+  lastFrameAt = 0;
+  assert.deepStrictEqual(healthState(Date.now()), ['health-warn', '!', 'NO VIDEO'],
+    'a responding camera without frames must identify the video path');
+  cameraUptime = null;
+  assert.deepStrictEqual(healthState(Date.now()), ['health-dead', '×', 'CAMERA OFFLINE'],
+    'an unreachable camera must be explicit without relying on color');
+  process.stdout.write('✓ health display separates camera and viewer uptime\n');
 })().then(() => process.exit(0)).catch(err => { process.stdout.write('✗ ' + err.message + '\n'); process.exit(1); });
 HARNESS
 
@@ -237,6 +265,12 @@ if ! grep -qE '#offline\[hidden\][[:space:]]*\{[^}]*display[[:space:]]*:[[:space
   exit 1
 fi
 echo "✓ offline card has an id-qualified [hidden] override"
+
+if ! grep -q 'right:4vw; bottom:4vh' "$TEMPLATE" || ! grep -q 'frame_sequence' "$TEMPLATE"; then
+  echo "✗ health badge must stay inside overscan and follow MJPEG frame progress"
+  exit 1
+fi
+echo "✓ health badge is overscan-safe and follows MJPEG frames"
 
 if node "$TEMP_DIR/harness.js" "$TEMP_DIR/viewer.js"; then
   echo "==> viewer reconnect tests passed"

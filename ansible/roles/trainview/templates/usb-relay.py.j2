@@ -1,0 +1,163 @@
+#!/usr/bin/env python3
+import json
+import os
+import select
+import subprocess
+import threading
+import time
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+DEVICE = "{{ trainview_usb_camera }}"
+PORT = {{ trainview_usb_relay_port }}
+STARTED = time.monotonic()
+condition = threading.Condition()
+latest = b""
+sequence = 0
+last_frame_at = 0.0
+
+
+def extract_frame(buffer):
+    start = buffer.find(b"\xff\xd8")
+    if start < 0:
+        return None, buffer[-1:]
+    end = buffer.find(b"\xff\xd9", start + 2)
+    if end < 0:
+        return None, buffer[start:]
+    return buffer[start:end + 2], buffer[end + 2:]
+
+
+def read_chunk(stream, timeout=5):
+    return os.read(stream.fileno(), 65536) if select.select([stream], [], [], timeout)[0] else None
+
+
+def stop_capture(process):
+    if process.poll() is None:
+        process.terminate()
+        try:
+            process.wait(timeout=2)
+        except subprocess.TimeoutExpired:
+            print("USB capture ignored SIGTERM; killing capture process", flush=True)
+            process.kill()
+    process.wait(timeout=2)
+
+
+def capture(process):
+    global latest, sequence, last_frame_at
+    buffer = b""
+    deadline = time.monotonic() + 5
+    while True:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise TimeoutError("5s without a complete JPEG frame")
+        chunk = read_chunk(process.stdout, remaining)
+        if chunk is None:
+            raise TimeoutError("5s without a complete JPEG frame")
+        if not chunk:
+            raise EOFError("capture stream ended")
+        buffer += chunk
+        if len(buffer) > 4 * 1024 * 1024:
+            raise ValueError("capture exceeded 4 MiB without a complete frame")
+        while True:
+            frame, buffer = extract_frame(buffer)
+            if frame is None:
+                break
+            with condition:
+                latest = frame
+                sequence += 1
+                last_frame_at = time.monotonic()
+                condition.notify_all()
+            deadline = time.monotonic() + 5
+
+
+def ingest():
+    global latest, sequence, last_frame_at
+    command = [
+        "/usr/bin/ffmpeg", "-hide_banner", "-loglevel", "error",
+        "-f", "v4l2", "-input_format", "mjpeg",
+        "-video_size", "1280x720", "-framerate", "30",
+        "-i", DEVICE, "-an", "-c:v", "copy",
+        "-f", "image2pipe", "pipe:1",
+    ]
+    while True:
+        process = None
+        try:
+            process = subprocess.Popen(command, stdout=subprocess.PIPE, bufsize=0)
+            capture(process)
+        except (OSError, EOFError, ValueError, subprocess.SubprocessError) as error:
+            print(f"USB relay reconnecting: {error}", flush=True)
+        finally:
+            if process is not None:
+                stop_capture(process)
+                process.stdout.close()
+        with condition:
+            latest = b""
+            last_frame_at = 0.0
+            condition.notify_all()
+        time.sleep(2)
+
+
+class Handler(BaseHTTPRequestHandler):
+    def setup(self):
+        super().setup()
+        self.connection.settimeout(5)
+
+    def do_GET(self):
+        path = self.path.partition("?")[0]
+        if path == "/status":
+            with condition:
+                age = round((time.monotonic() - last_frame_at) * 1000) if last_frame_at else None
+                payload = json.dumps({
+                    "uptime_s": round(time.monotonic() - STARTED),
+                    "frame_sequence": sequence,
+                    "frame_age_ms": age,
+                }, separators=(",", ":")).encode()
+            self.send_response(200 if age is not None and age < 3000 else 503)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("Content-Length", str(len(payload)))
+            self.end_headers()
+            self.wfile.write(payload)
+            return
+        if path != "/stream":
+            self.send_error(404)
+            return
+        with condition:
+            if not last_frame_at or time.monotonic() - last_frame_at >= 3:
+                self.send_response(503)
+                self.send_header("Content-Length", "0")
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.end_headers()
+                return
+        self.send_response(200)
+        self.send_header("Content-Type", "multipart/x-mixed-replace; boundary=frame")
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        seen = 0
+        try:
+            while True:
+                with condition:
+                    if not condition.wait_for(lambda: sequence != seen or not latest, timeout=3):
+                        return
+                    if not latest or time.monotonic() - last_frame_at >= 3:
+                        return
+                    frame, seen = latest, sequence
+                self.wfile.write(
+                    b"--frame\r\nContent-Type: image/jpeg\r\nContent-Length: "
+                    + str(len(frame)).encode()
+                    + b"\r\n\r\n"
+                    + frame
+                    + b"\r\n"
+                )
+        except (BrokenPipeError, ConnectionResetError, TimeoutError):
+            pass
+
+    def log_message(self, _format, *_args):
+        pass
+
+
+if __name__ == "__main__":
+    server = ThreadingHTTPServer(("127.0.0.1", PORT), Handler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    ingest()
