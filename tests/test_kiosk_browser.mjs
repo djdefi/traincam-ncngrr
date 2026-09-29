@@ -125,6 +125,16 @@ ThreadingHTTPServer(("127.0.0.1",18083),Handler).serve_forever()
     return (await client('Runtime.evaluate', { expression:'selected', returnByValue:true })).result.value;
   }
   await until(async () => await selected(usb) === 'usb', 'USB first frame and stable recovery');
+  const cameraLayout = await usb('Runtime.evaluate', { expression:`(() => {
+    const f = document.querySelector('#usb iframe');
+    const r = f.getBoundingClientRect(), d = f.contentDocument, w = f.contentWindow;
+    return { left:r.left / innerWidth, top:r.top / innerHeight,
+      fit:w.getComputedStyle(d.getElementById('mjpeg')).objectFit,
+      badge:parseFloat(w.getComputedStyle(d.getElementById('health')).fontSize) };
+  })()`, returnByValue:true });
+  assert(cameraLayout.result.value.left >= .049 && cameraLayout.result.value.top >= .049);
+  assert.equal(cameraLayout.result.value.fit, 'contain');
+  assert(cameraLayout.result.value.badge >= 24);
   console.log('PASS: real MJPEG frames select the USB camera');
   await json('http://127.0.0.1:18083/control/stale');
   await until(async () => await selected(usb) === 'visitor', 'stale MJPEG fallback', 15);
@@ -146,6 +156,17 @@ ThreadingHTTPServer(("127.0.0.1",18083),Handler).serve_forever()
   })()`, returnByValue:true });
   assert.equal(layout.result.value.overflow, false);
   assert.equal(layout.result.value.images, true);
+  for (const [width, height] of [[1920,1080], [1280,720], [640,480]]) {
+    await first('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor:1, mobile:false });
+    for (let i = 0; i < 4; i++) {
+      const result = await first('Runtime.evaluate', { expression:`(() => {
+        const w = document.querySelector('#visitor iframe').contentWindow;
+        w.eval('index = ${i}; showSlide()');
+        return w.document.documentElement.scrollHeight <= w.innerHeight;
+      })()`, returnByValue:true });
+      assert.equal(result.result.value, true, `visitor slide ${i} overflows at ${width}x${height}`);
+    }
+  }
   console.log('PASS: offline visitor assets load without overflow and both pages heartbeat');
 } catch (error) {
   for (let i = 0; i < children.length; i++) console.error(fs.readFileSync(path.join(dir, `child-${i}.log`), 'utf8').slice(-4000));

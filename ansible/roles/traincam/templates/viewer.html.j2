@@ -18,6 +18,9 @@
  .health-ok #liveDot { color:#1d572c; }
  .health-ok #liveDot.beat { color:#6ee787; }
  #health .clock { color:#eee; font-size:0.82em; font-weight:500; }
+ body.kiosk #health { font-size:clamp(24px, 2vw, 36px); right:2vw; bottom:2vh; gap:1rem; flex-wrap:wrap; max-width:90vw; }
+ body.kiosk #health .clock { display:none; }
+ body.kiosk video, body.kiosk #mjpeg { object-fit:contain; }
  #ui { position:fixed; top:2.4rem; left:0.6rem; z-index:10; display:flex; gap:0.4rem; flex-wrap:wrap; transition:opacity .4s; }
  video, #mjpeg { position:absolute; top:0; left:0; width:100vw; height:100vh; object-fit:cover; background:#000; transition:filter .3s; }
  body.ui-hidden header, body.ui-hidden #ui { opacity:0; pointer-events:none; }
@@ -73,6 +76,7 @@
   </div>
 <script>
 const PATH = 'traincam';
+if (new URLSearchParams(window.location.search).get('kiosk') === '1') document.body.classList.add('kiosk');
 // Derive MediaMTX base (viewer served on 8080; mediamtx on 8889 by default)
 // Where to reach MediaMTX. Normally this page is served BY the camera, so the
 // port swap below is right. But scripts/setup-kiosk.sh deliberately serves a
@@ -186,6 +190,7 @@ const stageEl = MJPEG ? document.getElementById('mjpeg') : videoEl;
 
 function log(msg){ console.log(msg); statusEl.textContent = msg; }
 function attemptFullscreen(auto=false){
+  if (document.body.classList.contains('kiosk')) return;
   const elem = document.fullscreenElement || document.webkitFullscreenElement;
   if (!elem) stageEl.requestFullscreen?.().catch(()=>{ if(!auto) log('Fullscreen denied'); });
 }

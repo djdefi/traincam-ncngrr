@@ -23,6 +23,11 @@ import io
 import subprocess
 from pathlib import Path
 
+unit = Path("ansible/roles/trainview/templates/traincam-kiosk.service.j2").read_text()
+first, second = unit.split("--class=TrainCam-HDMI-2")
+assert "output=usb" in first, "the larger HDMI-1 display must show USB"
+assert "output=1" in second, "the smaller HDMI-2 display must show train/visitor content"
+
 path = Path("ansible/roles/trainview/templates/esp32-relay.py.j2")
 source = path.read_text().replace("{{ trainview_esp32_camera }}", "camera").replace(
     "{{ trainview_esp32_relay_port }}", "8082"

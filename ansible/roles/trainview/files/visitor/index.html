@@ -23,8 +23,8 @@
   </figure>
   <section aria-label="Visitor information">
     <p class="eyebrow" id="eyebrow">EXPLORE THE RAILROAD</p>
-    <h1 id="title">Take the history home.</h1>
-    <p id="description">Discover our layout, photos, railroad history and upcoming public openings.</p>
+    <h1 id="title">Explore our railroad.</h1>
+    <p id="description">Photos, local history and upcoming openings.</p>
     <div class="scan"><img id="qr" src="website-qr.png" alt="QR code for https://ncngmodelrailroad.org/"><div><strong id="action">Scan to explore</strong><a id="link" href="https://ncngmodelrailroad.org/">ncngmodelrailroad.org</a></div></div>
     <p class="ask">Questions? Ask a volunteer here at the layout.</p>
   </section>
@@ -32,10 +32,10 @@
 <footer><span>Nevada County Fairgrounds · Grass Valley, California</span><span id="page">1 / 4</span><button id="pause" type="button">Pause slides</button></footer>
 <script>
 const slides = [
-  { tag:'EXPLORE THE RAILROAD', title:'Take the history home.', description:'Discover our layout, photos, railroad history and upcoming public openings.', action:'Scan to explore', url:'https://ncngmodelrailroad.org/', qr:'website-qr.png', photo:'layout.jpg', alt:'Town, tracks and mountain scenery on the N.C.N.G. layout', caption:'A little railroad. A lot of local history.' },
-  { tag:'FOLLOW THE ORIGINAL ROUTE', title:'Explore the historic map.', description:'See the original railroad route alongside modern terrain. This is a historical reconstruction, not the model track plan or a public trail map.', action:'Scan for the online map', url:'https://ncngmodelrailroad.org/map/', qr:'map-qr.png', photo:'trestle.jpg', alt:'A model train crossing the Bear River Bridge trestle', caption:'Discover the places behind the miniature scenes.' },
-  { tag:'VOLUNTEERS WELCOME', title:'Help keep the trains running.', description:'Run trains, welcome visitors, build scenery or help with maintenance. No model railroad experience needed.', action:'Scan to get involved', url:'https://ncngmodelrailroad.org/volunteer/', qr:'volunteer-qr.png', photo:'layout.jpg', alt:'Town, tracks and mountain scenery on the N.C.N.G. layout', caption:'There is a place for your skills and curiosity.' },
-  { tag:'DONATIONS & SPONSORSHIP INQUIRIES', title:'Help this little world grow.', description:'Support maintenance, scenery, equipment and visitor education. Ask us about donations or sponsoring the layout. Contact us for current contribution instructions.', action:'Scan for ways to help', url:'https://ncngmodelrailroad.org/donate/', qr:'donate-qr.png', photo:'engine.jpg', alt:'Model locomotive number 8 approaching through the layout scenery', caption:'Thank you for supporting a volunteer-built railroad.' },
+  { tag:'EXPLORE THE RAILROAD', title:'Explore our railroad.', description:'Photos, local history and upcoming openings.', action:'Scan to explore', url:'https://ncngmodelrailroad.org/', qr:'website-qr.png', photo:'layout.jpg', alt:'Town, tracks and mountain scenery on the N.C.N.G. layout', caption:'A little railroad. A lot of local history.' },
+  { tag:'FOLLOW THE ORIGINAL ROUTE', title:'Follow the old route.', description:'A historic reconstruction, not a trail or model track plan.', action:'Scan for the map', url:'https://ncngmodelrailroad.org/map/', qr:'map-qr.png', photo:'trestle.jpg', alt:'A model train crossing the Bear River Bridge trestle', caption:'Discover the places behind the miniature scenes.' },
+  { tag:'VOLUNTEERS WELCOME', title:'Volunteer with us.', description:'Run trains. Build scenery. Welcome visitors.', action:'Scan to join in', url:'https://ncngmodelrailroad.org/volunteer/', qr:'volunteer-qr.png', photo:'layout.jpg', alt:'Town, tracks and mountain scenery on the N.C.N.G. layout', caption:'There is a place for your skills and curiosity.' },
+  { tag:'DONATIONS & SPONSORSHIP', title:'Help the layout.', description:'Ask us about donations or sponsorship.', action:'Scan to help', url:'https://ncngmodelrailroad.org/donate/', qr:'donate-qr.png', photo:'engine.jpg', alt:'Model locomotive number 8 approaching through the layout scenery', caption:'Thank you for supporting a volunteer-built railroad.' },
 ];
 let index = 0, paused = false;
 function showSlide() {
@@ -46,7 +46,7 @@ function showSlide() {
   const qr = document.getElementById('qr');
   qr.src = slide.qr; qr.alt = 'QR code for ' + slide.url;
   const link = document.getElementById('link');
-  link.href = slide.url; link.textContent = slide.url.replace('https://', '').replace(/\/$/, '');
+  link.href = slide.url; link.textContent = 'ncngmodelrailroad.org';
   document.getElementById('page').textContent = `${index + 1} / ${slides.length}`;
 }
 document.getElementById('pause').onclick = () => {

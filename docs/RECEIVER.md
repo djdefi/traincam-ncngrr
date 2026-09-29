@@ -2,15 +2,23 @@
 
 The Raspberry Pi 5 receiver runs two independent 1920x1080 HDMI displays:
 
-- **HDMI-A-1:** live Pi camera, then ESP32 if it has fresh frames; otherwise
+- **HDMI-A-2 (smaller display):** live Pi camera, then ESP32 if it has fresh frames; otherwise
   local photographs and visitor information.
-- **HDMI-A-2:** full-screen USB camera; visitor information while USB is absent
+- **HDMI-A-1 (larger display):** full-screen USB camera; visitor information while USB is absent
   or recovering. The USB display does not depend on the Pi camera or WiFi.
 
 Visitor slides rotate every 20 seconds and contain locally stored photos and
 QR codes for the website, historic map, volunteering, and donation inquiries.
 The kiosk needs no internet to show them. Scanning a QR code opens the public
 website on the visitor's phone, which does require internet.
+
+Both kiosk outputs keep a 5% border on every edge to tolerate display overscan.
+Camera images use **Fit**, not cropped Fill, and the kiosk shows a large live
+status instead of small diagnostic clocks. Visitor text and QR codes are sized
+for viewing at a distance. The direct camera viewer retains its normal controls
+and diagnostics; these adjustments apply only to `?kiosk=1`. If a physical
+screen still clips, select its native/full-pixel picture mode in the monitor
+menu rather than reducing resolution.
 
 ## Provisioning
 
@@ -82,8 +90,8 @@ from a device that requires physical power cycling.
 
 In the live recovery exercise, a deliberately stopped FFmpeg was replaced and
 fresh USB frames resumed within 15 seconds. With the Pi video service stopped
-but its HTTP status still answering, the first display showed visitor slides
-while USB continued on the second; restoring video restored the first display.
+but its HTTP status still answering, the train-camera display showed visitor
+slides while USB continued on the other; restoring video restored the train view.
 These targeted checks are not a substitute for the cold-boot and soak checks.
 USB3 U1/U2 controls reported `disabled` during inspection, so the kernel's
 failed U1-enable messages alone are not proof that active link power saving
