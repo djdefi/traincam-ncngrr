@@ -361,6 +361,11 @@
       line: 'dtparam=watchdog=on'
     - regexp: '^dtparam=sdio_overclock='
       line: 'dtparam=sdio_overclock={{ traincam_sdio_overclock }}'
+    # libcamera allocates from Linux CMA, not gpu_mem, so anything above the
+    # firmware default (64 on <1 GB boards) is RAM taken from the OS. The image
+    # shipped 128; that was 64 MB of a ~110 MB margin on 2026-09-29.
+    - regexp: '^gpu_mem='
+      line: 'gpu_mem=64'
   loop_control:
     label: "{{ item.line }}"
 
@@ -443,6 +448,8 @@
     - pipewire-pulse.service
     - wireplumber.service
     - filter-chain.service
+    - pulseaudio.socket
+    - pulseaudio.service
 
 # WiFi power save cycles the chip's KSO (Keep SDIO On) register. Waking it can
 # fail under load and heat, and a failed wake reports the same -110 that killed
