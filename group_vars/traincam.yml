@@ -202,6 +202,12 @@ traincam_journal_runtime_max_use: 8M
 # the show can't reboot every camera in the hall.
 traincam_netwatch_interval_sec: 30
 traincam_netwatch_threshold: 10
+
+# Stream watchdog: restart the capture service when ffmpeg stops receiving
+# H.264 from rpicam-vid while both are still running. threshold x interval =
+# how long a frozen picture is tolerated. The service is back in ~2s.
+traincam_streamwatch_interval_sec: 10
+traincam_streamwatch_threshold: 3
 # SDIO clock for the WiFi chip, in MHz. Default is 50 (measured). Halving it
 # widens setup/hold margins, which is the cheapest defence against the -110
 # bus timeouts, and costs nothing at our bitrate.

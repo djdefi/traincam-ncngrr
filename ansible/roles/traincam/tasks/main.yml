@@ -530,3 +530,51 @@
     enabled: true
     state: started
     daemon_reload: true
+
+# A wedged rpicam-vid keeps every process alive while the picture freezes, so
+# neither Restart=always, netwatch nor the hardware watchdog notices.
+- name: Deploy the stream watchdog
+  ansible.builtin.template:
+    src: streamwatch.sh.j2
+    dest: /usr/local/bin/traincam-streamwatch
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Deploy the stream watchdog unit
+  ansible.builtin.copy:
+    content: |
+      # Managed by Ansible (traincam role)
+      [Unit]
+      Description=TrainCam stream watchdog
+      [Service]
+      Type=oneshot
+      ExecStart=/usr/local/bin/traincam-streamwatch
+    dest: /etc/systemd/system/traincam-streamwatch.service
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Deploy the stream watchdog timer
+  ansible.builtin.copy:
+    content: |
+      # Managed by Ansible (traincam role)
+      [Unit]
+      Description=Run the TrainCam stream watchdog every {{ traincam_streamwatch_interval_sec }}s
+      [Timer]
+      OnBootSec=2min
+      OnUnitActiveSec={{ traincam_streamwatch_interval_sec }}s
+      AccuracySec=1s
+      [Install]
+      WantedBy=timers.target
+    dest: /etc/systemd/system/traincam-streamwatch.timer
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Enable the stream watchdog timer
+  ansible.builtin.systemd:
+    name: traincam-streamwatch.timer
+    enabled: true
+    state: started
+    daemon_reload: true
