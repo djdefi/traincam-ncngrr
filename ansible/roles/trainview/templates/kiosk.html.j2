@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>TrainCam kiosk</title>
+<style>
+html, body, main, .feed { width:100%; height:100%; margin:0; background:#000; overflow:hidden; }
+.feed[hidden] { display:none; }
+iframe { width:100%; height:100%; border:0; }
+</style>
+</head>
+<body>
+<main>
+  <section id="pi" class="feed"><iframe title="Raspberry Pi TrainCam" src="/viewer.html?whepBase=http://{{ trainview_camera }}:{{ trainview_whep_port }}"></iframe></section>
+  <section id="esp32" class="feed"><iframe title="ESP32 TrainCam" src="/viewer.html?mjpeg=http://127.0.0.1:{{ trainview_esp32_relay_port }}/stream&amp;mjpegStatus=http://127.0.0.1:{{ trainview_esp32_relay_port }}/status"></iframe></section>
+  <section id="usb" class="feed"><iframe title="Local USB camera" src="/viewer.html?mjpeg=http://127.0.0.1:{{ trainview_usb_relay_port }}/stream&amp;mjpegStatus=http://127.0.0.1:{{ trainview_usb_relay_port }}/status"></iframe></section>
+  <section id="visitor" class="feed" hidden><iframe title="Explore the N.C.N.G. railroad" src="/visitor/index.html"></iframe></section>
+</main>
+<script src="/visitor/kiosk.js"></script>
+</body>
+</html>

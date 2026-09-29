@@ -8,10 +8,19 @@
  header { padding:0.4rem 0.75rem; width:100%; box-sizing:border-box; background:rgba(0,0,0,0.45); position:fixed; top:0; left:0; display:flex; gap:1rem; align-items:center; z-index:10; backdrop-filter: blur(4px); transition:opacity .4s; }
  h1 { margin:0; font-size:1.1rem; }
  #status { font-size:0.8rem; opacity:0.8; }
+ #health { position:fixed; right:4vw; bottom:4vh; z-index:10; display:flex; gap:0.65rem;
+           align-items:center; background:rgba(0,0,0,0.65); padding:0.45rem 0.7rem; border-radius:4px;
+           font-size:1.15rem; font-weight:650; font-variant-numeric:tabular-nums; }
+ #health.health-ok { color:#6ee787; }
+ #health.health-warn { color:#f2cc60; }
+ #health.health-dead { color:#ff7b72; }
+ #liveDot { display:inline-block; min-width:1em; text-align:center; }
+ .health-ok #liveDot { color:#1d572c; }
+ .health-ok #liveDot.beat { color:#6ee787; }
+ #health .clock { color:#eee; font-size:0.82em; font-weight:500; }
  #ui { position:fixed; top:2.4rem; left:0.6rem; z-index:10; display:flex; gap:0.4rem; flex-wrap:wrap; transition:opacity .4s; }
  video, #mjpeg { position:absolute; top:0; left:0; width:100vw; height:100vh; object-fit:cover; background:#000; transition:filter .3s; }
- footer { transition:opacity .4s; }
- body.ui-hidden header, body.ui-hidden #ui, body.ui-hidden footer { opacity:0; pointer-events:none; }
+ body.ui-hidden header, body.ui-hidden #ui { opacity:0; pointer-events:none; }
  body.ui-hidden { cursor:none; }
  button { background:#333; color:#eee; border:1px solid #555; padding:0.4rem 0.8rem; cursor:pointer; margin-right:0.4rem; }
  button:hover { background:#444; }
@@ -55,7 +64,13 @@
     <p>This camera rides on the train, running on track power with a small battery
        for backup. If the picture pauses it is usually the WiFi &mdash; it comes back on its own.</p>
   </div>
-  <footer style="position:fixed; right:0.6rem; bottom:0.4rem; margin:0; z-index:10; background:rgba(0,0,0,0.35); padding:0.25rem 0.5rem; border-radius:4px;">LAN WebRTC &lt;500ms</footer>
+  <div id="health" class="health-warn" aria-label="Stream health">
+    <span><span id="liveDot">…</span> <span id="liveText">CHECKING</span></span>
+    <span class="clock">Camera <span id="cameraUptime">--</span></span>
+    <span id="cameraPower" class="clock" hidden>Power <span id="cameraPowerValue">--</span></span>
+    <span id="cameraTemperature" class="clock" hidden>Temp <span id="cameraTemperatureValue">--</span></span>
+    <span class="clock">Viewer <span id="viewerUptime">00:00:00</span></span>
+  </div>
 <script>
 const PATH = 'traincam';
 // Derive MediaMTX base (viewer served on 8080; mediamtx on 8889 by default)
@@ -77,7 +92,7 @@ const MTX_BASE = (() => {
 const AUTOREC_DELAY_MS = 1500;
 const AUTOREC_MAX_MS = 15000;
 let retryDelay = AUTOREC_DELAY_MS;
-let pc, abortController, reconnectTimer, uiHideTimer;
+let pc, abortController, reconnectTimer, uiHideTimer, connectionDeadline;
 const statusEl = document.getElementById('status');
 const videoEl = document.getElementById('video');
 const connectBtn = document.getElementById('connectBtn');
@@ -86,11 +101,77 @@ const fsBtn = document.getElementById('fsBtn');
 const fitBtn = document.getElementById('fitBtn');
 const autorec = document.getElementById('autorec');
 const offlineEl = document.getElementById('offline');
+const healthEl = document.getElementById('health');
+const liveDot = document.getElementById('liveDot');
+const liveText = document.getElementById('liveText');
+const cameraUptimeEl = document.getElementById('cameraUptime');
+const cameraPowerEl = document.getElementById('cameraPower');
+const cameraPowerValueEl = document.getElementById('cameraPowerValue');
+const cameraTemperatureEl = document.getElementById('cameraTemperature');
+const cameraTemperatureValueEl = document.getElementById('cameraTemperatureValue');
+const viewerUptimeEl = document.getElementById('viewerUptime');
+const viewerStartedAt = Date.now();
+let lastFrameAt = 0, cameraUptime = null, cameraStatusAt = 0, cameraChecked = false;
+let lastPresentedFrame = -Infinity;
+let cameraPowerMv = null, cameraTemperatureC = null;
+const CAMERA_STATUS = (() => {
+  try {
+    const u = new URL(MTX_BASE);
+    u.port = '{{ traincam_viewer_port | default(8080) }}';
+    u.pathname = '/status'; u.search = ''; u.hash = '';
+    return u.href;
+  } catch (_) { return null; }
+})();
+function formatDuration(seconds) {
+  seconds = Math.max(0, Math.floor(seconds));
+  const h = String(Math.floor(seconds / 3600)).padStart(2, '0');
+  const m = String(Math.floor(seconds % 3600 / 60)).padStart(2, '0');
+  const s = String(seconds % 60).padStart(2, '0');
+  return `${h}:${m}:${s}`;
+}
+function noteCameraStatus(status) {
+  cameraUptime = Number(status.uptime_s);
+  cameraPowerMv = Number.isFinite(Number(status.battery_mv)) ? Number(status.battery_mv) : null;
+  cameraTemperatureC = Number.isFinite(Number(status.temperature_c)) ? Number(status.temperature_c) : null;
+  cameraStatusAt = Date.now();
+  cameraChecked = true;
+}
+function healthState(now) {
+  const streamLive = MJPEG ? mjpegLive && cameraUptime !== null : lastFrameAt && now - lastFrameAt < 2500;
+  if (!cameraChecked) return ['health-warn', '…', 'CHECKING'];
+  if (cameraUptime === null) return ['health-dead', '×', 'CAMERA OFFLINE'];
+  if (streamLive) return ['health-ok', '▶', 'LIVE'];
+  return ['health-warn', '!', 'NO VIDEO'];
+}
 // Hide it on `timeupdate`, not `playing`: currentTime only advances when frames
 // actually land, so this is the same signal the STALL_MS watchdog trusts below.
 // `playing` fires on a stream that then stalls, which would clear the card and
 // leave the public looking at a black screen again.
-videoEl.addEventListener('timeupdate', () => { if (!offlineEl.hidden) offlineEl.hidden = true; });
+videoEl.addEventListener('timeupdate', () => {
+  if (!videoEl.paused && videoEl.currentTime > 0) lastPresentedFrame = performance.now();
+  if (!offlineEl.hidden) offlineEl.hidden = true;
+  lastFrameAt = Date.now();
+  // A CSS animation would keep blinking if JavaScript froze. Drive this from
+  // the media clock so a stopped pulse means frames really stopped advancing.
+  liveDot.classList.toggle('beat', Math.floor(videoEl.currentTime * 2) % 2 === 0);
+});
+setInterval(() => {
+  const now = Date.now();
+  viewerUptimeEl.textContent = formatDuration((now - viewerStartedAt) / 1000);
+  const [stateClass, symbol, label] = healthState(now);
+  healthEl.className = stateClass;
+  liveDot.textContent = symbol;
+  liveText.textContent = label;
+  if (stateClass !== 'health-ok') liveDot.classList.remove('beat');
+  else if (MJPEG) liveDot.classList.add('beat');
+  cameraUptimeEl.textContent = cameraUptime === null
+    ? 'offline'
+    : formatDuration(cameraUptime + (now - cameraStatusAt) / 1000);
+  cameraPowerEl.hidden = cameraPowerMv === null;
+  if (cameraPowerMv !== null) cameraPowerValueEl.textContent = `${(cameraPowerMv / 1000).toFixed(2)} V`;
+  cameraTemperatureEl.hidden = cameraTemperatureC === null;
+  if (cameraTemperatureC !== null) cameraTemperatureValueEl.textContent = `${cameraTemperatureC.toFixed(1)} °C`;
+}, 1000);
 
 // ponytail: ?mjpeg=<url> puts the page in MJPEG mode for the ESP32 cameras. The
 // browser is already an MJPEG decoder, so this needs an <img> and no library.
@@ -137,18 +218,31 @@ async function connect(){
   // tear down the live one.
   const conn = pc = new RTCPeerConnection({ iceServers: [] });
   const fail = msg => { if (pc !== conn) return; log(msg); cleanup(); if (autorec.checked) scheduleReconnect(); };
+  connectionDeadline = setTimeout(function connectionTimeout() {
+    if (pc === conn && conn.connectionState !== 'connected') fail('Connection timed out');
+  }, 12000);
   conn.addEventListener('track', ev => { if (pc === conn && ev.track.kind==='video') videoEl.srcObject = ev.streams[0]; });
   conn.addEventListener('connectionstatechange', () => {
     if (pc !== conn) return;
     if (['disconnected','failed','closed'].includes(conn.connectionState)) fail('State: ' + conn.connectionState);
-    else { if (conn.connectionState === 'connected') { retryDelay = AUTOREC_DELAY_MS; lastMediaAt = Date.now(); lastMediaTime = -1; } log('State: ' + conn.connectionState); }
+    else { if (conn.connectionState === 'connected') { clearTimeout(connectionDeadline); retryDelay = AUTOREC_DELAY_MS; lastMediaAt = performance.now(); lastMediaTime = -1; } log('State: ' + conn.connectionState); }
   });
   conn.addTransceiver('video',{direction:'recvonly'});
   try {
     const offer = await conn.createOffer();
+    if (pc !== conn) return;
     await conn.setLocalDescription(offer);
+    if (pc !== conn) return;
     const base = MTX_BASE.replace(/\/$/,'');
     const resp = await fetch(`${base}/${PATH}/whep`,{method:'POST',body:offer.sdp,headers:{'Content-Type':'application/sdp','Accept':'application/sdp'},cache:'no-store',signal:abortController.signal});
+    if (pc !== conn) {
+      const abandoned = resp.headers.get('Location');
+      if (abandoned) {
+        fetch(new URL(abandoned, base).href, { method:'DELETE', keepalive:true, cache:'no-store' })
+          .catch(error => console.warn('Could not release abandoned WHEP session', error));
+      }
+      return;
+    }
     if (!resp.ok) throw new Error(`WHEP rejected: ${resp.status}`);
     // Location is relative ("/traincam/whep/<uuid>"), so resolve it against
     // the WHEP origin rather than this page's.
@@ -162,7 +256,7 @@ async function connect(){
   connectBtn.disabled = true; disconnectBtn.disabled = false; showUI();
 }
 
-function cleanup(){ releaseResource(); if (abortController) abortController.abort(); if (pc){ try{ pc.close(); }catch(_){} } pc=null; lastMediaAt=0;
+function cleanup(){ clearTimeout(connectionDeadline); lastPresentedFrame = -Infinity; releaseResource(); if (abortController) abortController.abort(); if (pc){ try{ pc.close(); }catch(_){} } pc=null; lastMediaAt=0;
   // Drop the last frame. Leaving it on screen at a show reads as a train that
   // has stopped, not a camera that has gone away, and nobody comes to look.
   try { videoEl.srcObject = null; } catch(_){}
@@ -179,7 +273,7 @@ const STALL_MS = 8000;
 let lastMediaTime = -1, lastMediaAt = 0;
 setInterval(() => {
   if (!pc || pc.connectionState !== 'connected' || !lastMediaAt) return;
-  const t = videoEl.currentTime, now = Date.now();
+  const t = videoEl.currentTime, now = performance.now();
   if (t !== lastMediaTime) { lastMediaTime = t; lastMediaAt = now; return; }
   if (now - lastMediaAt > STALL_MS) { log('Stalled - reconnecting'); cleanup(); if (autorec.checked) scheduleReconnect(); }
 }, 2000);
@@ -210,16 +304,18 @@ fitBtn.onclick = () => { if (stageEl.style.objectFit==='contain'){ stageEl.style
 // So error covers the kiosk-booted-before-the-camera case and nothing else, and
 // no listener can see a freeze. Poll the camera's status port for that instead.
 const MJPEG_STATUS_PORT = '81';   // firmware serves /status + /control here
+const MJPEG_STATUS = new URLSearchParams(window.location.search).get('mjpegStatus');
 const MJPEG_POLL_MS = 5000;
 let mjpegLive = false;            // true only between a first frame and the next reload
+let mjpegStatusAt = -Infinity;
 function startMjpeg(){
   videoEl.hidden = true; stageEl.hidden = false;
   connectBtn.disabled = true; disconnectBtn.disabled = true; autorec.checked = true;
-  document.querySelector('footer').textContent = 'LAN MJPEG';
   // Cache-bust each retry or the browser will happily re-serve the dead stream.
-  const load = () => { mjpegLive = false; offlineEl.hidden = false; stageEl.src = MJPEG + (MJPEG.includes('?') ? '&' : '?') + 't=' + Date.now(); log('MJPEG ' + MJPEG); };
+  let retry = null;
+  const load = () => { clearTimeout(retry); mjpegLive = false; mjpegStatusAt = -Infinity; offlineEl.hidden = false; stageEl.src = MJPEG + (MJPEG.includes('?') ? '&' : '?') + 't=' + Date.now(); log('MJPEG ' + MJPEG); };
   stageEl.onload = () => { mjpegLive = true; offlineEl.hidden = true; };
-  stageEl.onerror = () => { log('MJPEG lost - retrying'); setTimeout(load, 2000); };
+  stageEl.onerror = () => { mjpegLive = false; log('MJPEG lost - retrying'); clearTimeout(retry); retry = setTimeout(load, 2000); };
   load();
   watchMjpeg(load);
 }
@@ -231,23 +327,56 @@ function startMjpeg(){
 function watchMjpeg(reload){
   let status;
   try {
-    const u = new URL(MJPEG, location.href);
-    u.port = MJPEG_STATUS_PORT; u.pathname = '/status'; u.search = '';
+    const u = new URL(MJPEG_STATUS || MJPEG, location.href);
+    if (!MJPEG_STATUS) { u.port = MJPEG_STATUS_PORT; u.pathname = '/status'; u.search = ''; }
     status = u.href;
   } catch (e) { log('MJPEG watchdog off'); return; }
-  let lastUp = null, fails = 0;
+  let lastUp = null, lastSequence = null, fails = 0;
   setInterval(() => {
-    fetch(status + '?t=' + Date.now(), { cache: 'no-store' })
-      .then(r => r.json())
+    fetch(status + '?t=' + Date.now(), { cache: 'no-store', signal: AbortSignal.timeout(3000) })
+      .then(r => { if (!r.ok) throw new Error('MJPEG status ' + r.status); return r.json(); })
       .then(s => {
+        noteCameraStatus(s);
+        const frameSequence = Number(s.frame_sequence);
+        const framesAdvanced = Number.isFinite(frameSequence) &&
+          (lastSequence === null || frameSequence > lastSequence);
+        if (s.frame_age_ms !== undefined && (s.frame_age_ms === null || s.frame_age_ms >= 3000)) {
+          throw new Error('MJPEG frames are stale');
+        }
+        // Relay health cannot prove the browser has received the image.
+        if (mjpegLive && (!Number.isFinite(frameSequence) || framesAdvanced)) mjpegStatusAt = performance.now();
         if (lastUp !== null && s.uptime_s < lastUp) { log('Camera rebooted - reconnecting'); reload(); }
+        else if (Number.isFinite(frameSequence) && lastSequence !== null && frameSequence <= lastSequence) {
+          mjpegLive = false; log('MJPEG frames stopped - reconnecting'); reload();
+        }
         else if (!mjpegLive) { log('Camera up but no picture - reconnecting'); reload(); }
+        if (Number.isFinite(frameSequence)) lastSequence = frameSequence;
         lastUp = s.uptime_s; fails = 0;
       })
-      .catch(() => { if (++fails >= 2) { log('Camera unreachable - reconnecting'); reload(); lastUp = null; fails = 0; } });
+      .catch(() => { mjpegStatusAt = -Infinity; if (++fails >= 2) { cameraUptime = null; cameraChecked = true; log('Camera unreachable - reconnecting'); reload(); lastUp = null; fails = 0; } });
   }, MJPEG_POLL_MS);
 }
-window.addEventListener('load', () => { MJPEG ? startMjpeg() : connect(); setTimeout(()=>attemptFullscreen(true),600); scheduleUIHide(); });
+function pollPiStatus() {
+  if (!CAMERA_STATUS) return;
+  fetch(CAMERA_STATUS + '?t=' + Date.now(), { cache:'no-store', signal: AbortSignal.timeout(3000) })
+    .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then(noteCameraStatus)
+    .catch(() => { cameraUptime = null; cameraChecked = true; });
+}
+window.addEventListener('load', () => {
+  if (MJPEG) startMjpeg();
+  else { connect(); pollPiStatus(); setInterval(pollPiStatus, 5000); }
+  setTimeout(()=>attemptFullscreen(true),600); scheduleUIHide();
+  if (window.parent !== window) {
+    const heartbeat = () => window.parent.postMessage({
+      type: 'traincam-viewer-heartbeat',
+      live: MJPEG ? mjpegLive && performance.now() - mjpegStatusAt < 8000
+        : performance.now() - lastPresentedFrame < 4000,
+    }, location.origin);
+    heartbeat();
+    setInterval(heartbeat, 2000);
+  }
+});
 // Closing the tab or backgrounding the app on a phone otherwise leaves the
 // session open on the server forever - the exact thing a hall full of
 // wandering visitors will do all day.

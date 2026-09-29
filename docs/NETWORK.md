@@ -80,8 +80,12 @@ traincameranet (WiFi AP)
        │
        └─── trainview1.local (Pi 5 - receiver)
                  │
-                 └── Chromium → http://traincam1.local:8080/viewer.html
+                 └── Chromium → http://localhost:8081/kiosk.html
 ```
+
+The receiver serves its pages and visitor slides locally. Its independent USB
+camera remains usable without WiFi; remote video health controls the other
+display. See [receiver deployment and recovery](RECEIVER.md).
 
 ## Viewer URL Parameters
 

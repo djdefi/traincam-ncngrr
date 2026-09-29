@@ -1,0 +1,9 @@
+[Unit]
+Description=TrainCam ESP32 MJPEG relay
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 {{ trainview_www }}/esp32-relay.py
+Restart=always
+RestartSec=2

@@ -145,22 +145,20 @@ else
 fi
 
 KIOSK_SETUP="scripts/setup-kiosk.sh"
-if grep -q 'ExecStartPre=.*wlr-randr' "$KIOSK_SETUP" &&
-   grep -q 'traincam-kiosk.desktop' "$KIOSK_SETUP" &&
-   grep -q 'After=.*xdg-desktop-portal.service' "$KIOSK_SETUP"; then
+if grep -q 'ansible-playbook.*kiosk.yml' "$KIOSK_SETUP" &&
+   grep -q 'ExecStartPre=.*wlr-randr' ansible/roles/trainview/templates/traincam-kiosk.service.j2 &&
+   grep -q '.config/labwc/autostart' ansible/roles/trainview/tasks/main.yml; then
   test_case "Kiosk starts from the graphical session" "found" "found"
 else
   test_case "Kiosk starts from the graphical session" "found" "missing"
 fi
 
-# Both HDMI panels must show the stream. setup-kiosk.sh writes a kanshi mirror
-# that overlaps both outputs at the same 0,0 origin; if that line is lost the
-# second panel goes dark, which is exactly the failure this asserts against.
-if grep -q 'KANSHI_CFG' "$KIOSK_SETUP" &&
-   grep -Eq 'output HDMI-A-2 .*position 0,0' "$KIOSK_SETUP"; then
-  test_case "Kiosk mirrors both HDMI outputs" "found" "found"
+# Independent outputs allow full-screen USB beside visitor information.
+if grep -Eq 'output HDMI-A-2 .*position 1920,0' ansible/roles/trainview/templates/kanshi.conf.j2 &&
+   grep -q 'TrainCam-HDMI-2' ansible/roles/trainview/templates/labwc-rc.xml.j2; then
+  test_case "Kiosk configures both HDMI outputs independently" "found" "found"
 else
-  test_case "Kiosk mirrors both HDMI outputs" "found" "missing"
+  test_case "Kiosk configures both HDMI outputs independently" "found" "missing"
 fi
 
 # Slow boot was SD-card IO starvation from services the appliance does not need.
