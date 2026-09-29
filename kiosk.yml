@@ -1,0 +1,6 @@
+---
+- name: Deploy TrainCam display kiosk
+  hosts: trainview
+  become: true
+  roles:
+    - trainview

@@ -1,0 +1,7 @@
+---
+trainview_user: train
+trainview_camera: 192.168.0.106
+trainview_esp32_camera: 192.168.0.105
+trainview_local_port: 8081
+trainview_whep_port: 8889
+trainview_usb_camera: /dev/v4l/by-id/usb-Razer_Inc_Razer_Kiyo_Pro-video-index0

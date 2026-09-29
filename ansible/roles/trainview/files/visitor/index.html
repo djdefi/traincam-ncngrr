@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Explore the N.C.N.G. Historical Model Railroad</title>
+<script>
+  (() => {
+    const param = new URLSearchParams(window.location.search).get("clawpilotTheme");
+    const theme =
+      param || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+    document.documentElement.setAttribute("data-theme", theme);
+  })();
+</script>
+<link rel="stylesheet" href="visitor.css">
+</head>
+<body>
+<header><span>N.C.N.G.</span><div>HISTORICAL MODEL RAILROAD<small>Built by volunteers. Shared with you.</small></div></header>
+<main>
+  <figure>
+    <img id="photo" src="layout.jpg" alt="Town, tracks and mountain scenery on the N.C.N.G. layout">
+    <figcaption><span id="caption">A little railroad. A lot of local history.</span><small>Layout photographs: ncngmodelrailroad.org/gallery</small></figcaption>
+  </figure>
+  <section aria-label="Visitor information">
+    <p class="eyebrow" id="eyebrow">EXPLORE THE RAILROAD</p>
+    <h1 id="title">Explore our railroad.</h1>
+    <p id="description">Photos, local history and upcoming openings.</p>
+    <div class="scan"><img id="qr" src="website-qr.png" alt="QR code for https://ncngmodelrailroad.org/"><div><strong id="action">Scan to explore</strong><a id="link" href="https://ncngmodelrailroad.org/">ncngmodelrailroad.org</a></div></div>
+    <p class="ask">Questions? Ask a volunteer here at the layout.</p>
+  </section>
+</main>
+<footer><span>Nevada County Fairgrounds · Grass Valley, California</span><span id="page">1 / 4</span><button id="pause" type="button">Pause slides</button></footer>
+<script>
+const slides = [
+  { tag:'EXPLORE THE RAILROAD', title:'Explore our railroad.', description:'Photos, local history and upcoming openings.', action:'Scan to explore', url:'https://ncngmodelrailroad.org/', qr:'website-qr.png', photo:'layout.jpg', alt:'Town, tracks and mountain scenery on the N.C.N.G. layout', caption:'A little railroad. A lot of local history.' },
+  { tag:'FOLLOW THE ORIGINAL ROUTE', title:'Follow the old route.', description:'A historic reconstruction, not a trail or model track plan.', action:'Scan for the map', url:'https://ncngmodelrailroad.org/map/', qr:'map-qr.png', photo:'trestle.jpg', alt:'A model train crossing the Bear River Bridge trestle', caption:'Discover the places behind the miniature scenes.' },
+  { tag:'VOLUNTEERS WELCOME', title:'Volunteer with us.', description:'Run trains. Build scenery. Welcome visitors.', action:'Scan to join in', url:'https://ncngmodelrailroad.org/volunteer/', qr:'volunteer-qr.png', photo:'layout.jpg', alt:'Town, tracks and mountain scenery on the N.C.N.G. layout', caption:'There is a place for your skills and curiosity.' },
+  { tag:'DONATIONS & SPONSORSHIP', title:'Help the layout.', description:'Ask us about donations or sponsorship.', action:'Scan to help', url:'https://ncngmodelrailroad.org/donate/', qr:'donate-qr.png', photo:'engine.jpg', alt:'Model locomotive number 8 approaching through the layout scenery', caption:'Thank you for supporting a volunteer-built railroad.' },
+];
+let index = 0, paused = false;
+function showSlide() {
+  const slide = slides[index];
+  for (const [id, key] of [['eyebrow','tag'], ['title','title'], ['description','description'], ['action','action'], ['caption','caption']]) document.getElementById(id).textContent = slide[key];
+  const photo = document.getElementById('photo');
+  photo.src = slide.photo; photo.alt = slide.alt;
+  const qr = document.getElementById('qr');
+  qr.src = slide.qr; qr.alt = 'QR code for ' + slide.url;
+  const link = document.getElementById('link');
+  link.href = slide.url; link.textContent = 'ncngmodelrailroad.org';
+  document.getElementById('page').textContent = `${index + 1} / ${slides.length}`;
+}
+document.getElementById('pause').onclick = () => {
+  paused = !paused;
+  document.getElementById('pause').textContent = paused ? 'Resume slides' : 'Pause slides';
+};
+setInterval(() => { if (!paused) { index = (index + 1) % slides.length; showSlide(); } }, 20000);
+const heartbeat = () => window.parent.postMessage({ type:'traincam-viewer-heartbeat', live:false }, location.origin);
+heartbeat();
+setInterval(heartbeat, 2000);
+</script>
+</body>
+</html>

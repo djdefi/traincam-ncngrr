@@ -1,0 +1,9 @@
+[Unit]
+Description=TrainCam USB camera MJPEG relay
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 {{ trainview_www }}/usb-relay.py
+Restart=always
+RestartSec=2
+TimeoutStopSec=5

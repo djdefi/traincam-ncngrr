@@ -1,0 +1,12 @@
+[Unit]
+Description=TrainCam kiosk local page server
+
+[Service]
+Type=simple
+WorkingDirectory={{ trainview_www }}
+ExecStart=/usr/bin/python3 {{ trainview_www }}/kiosk-server.py --directory {{ trainview_www }} --port {{ trainview_local_port }} --watchdog
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=default.target
