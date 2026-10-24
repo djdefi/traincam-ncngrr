@@ -119,9 +119,24 @@ check "httpd purges stale sockets" "$got" "yes"
 # /status is the only way to tell a healthy board from one that has been
 # rebooting all afternoon - boots and wifi_restarts live in RTC memory and
 # survive the soft resets above.
-for token in "wifi_restarts" "min_heap" "uptime_s"; do
+for token in "wifi_restarts" "min_heap" "uptime_s" "battery_mv" "temperature_c" "sensor_pid"; do
   if grep -qF "$token" "$HTTPD"; then got=yes; else got=no; fi
   check "/status reports $token" "$got" "yes"
+done
+
+for token in "analogReadMilliVolts" "BATTERY_CALIBRATION" "16.0f) * 2.0f" \
+             "TELEMETRY_INTERVAL_MS" "temperatureRead()"; do
+  if grep -qF "$token" "$INO"; then got=yes; else got=no; fi
+  check "battery divider readout: $token present" "$got" "yes"
+done
+
+if grep -qF "readBatteryMillivolts()" "$HTTPD"; then got=no; else got=yes; fi
+check "/status uses cached telemetry" "$got" "yes"
+
+# Low-light tuning has to happen live at the layout, not through flash cycles.
+for knob in gainceiling aec2 ae_level aec_value agc_gain awb wb_mode lenc; do
+  if grep -qF "{\"$knob\"," "$HTTPD"; then got=yes; else got=no; fi
+  check "/control accepts $knob" "$got" "yes"
 done
 
 echo

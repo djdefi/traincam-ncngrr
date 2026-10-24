@@ -153,6 +153,15 @@ the playbook, so `/dev/i2c-1` does not exist and the gauge cannot be seen at all
 - Power: 5V via USB-C from battery bank
 - Runs `CameraWebServer` sketch for MJPEG streaming
 
+**Tuning the ESP32 live.** `:81/status` reports `sensor_pid` (`0x26` OV2640,
+`0x3660` OV3660 — Seeed changed the Sense module in 2025). `:81/control` takes
+`framesize`, `quality`, and the sensor's exposure and colour settings
+(`gainceiling` 0–6, `aec2`, `ae_level` -2–2, `aec`/`aec_value`, `agc`/`agc_gain`,
+`brightness`/`contrast`/`saturation`, `awb`/`awb_gain`/`wb_mode` 0–4, `lenc`,
+`bpc`, `wpc`), and echoes what stuck. Changes last until reboot; bake the winners
+into `setup()`. Indoors on 2026-10-24, SVGA ran ~7fps at ~1.9Mbps — exposure,
+not WiFi, set the frame rate — so light on the scene beats any setting.
+
 ## Physical Installation
 
 ```

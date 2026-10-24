@@ -11,6 +11,8 @@
 // reboots the WiFi recovery performs.
 extern uint32_t bootCount;
 extern uint32_t wifiRestartCount;
+extern uint32_t batteryMillivolts;
+extern float dieTemperatureC;
 
 #define PART_BOUNDARY "123456789000000000000987654321"
 static const char *_STREAM_CONTENT_TYPE = "multipart/x-mixed-replace;boundary=" PART_BOUNDARY;
@@ -107,14 +109,20 @@ static esp_err_t index_handler(httpd_req_t *req) {
 // "is it up right now" - not "has it been rebooting all afternoon", which is
 // exactly what the WiFi recovery above needs to be checked against.
 static esp_err_t status_handler(httpd_req_t *req) {
-  char buf[224];
+  // Seeed moved the Sense module from OV2640 to OV3660 in 2025, and the two
+  // need different tuning; this says which one is actually in the car.
+  sensor_t *s = esp_camera_sensor_get();
+  char buf[288];
   int len = snprintf(
     buf, sizeof(buf),
     "{\"uptime_s\":%lu,\"heap\":%lu,\"min_heap\":%lu,\"rssi\":%d,"
-    "\"boots\":%lu,\"wifi_restarts\":%lu}",
+    "\"boots\":%lu,\"wifi_restarts\":%lu,\"battery_mv\":%lu,"
+    "\"temperature_c\":%.1f,\"sensor_pid\":\"0x%x\"}",
     (unsigned long)(millis() / 1000), (unsigned long)ESP.getFreeHeap(),
     (unsigned long)ESP.getMinFreeHeap(), WiFi.RSSI(),
-    (unsigned long)bootCount, (unsigned long)wifiRestartCount);
+    (unsigned long)bootCount, (unsigned long)wifiRestartCount,
+    (unsigned long)batteryMillivolts, dieTemperatureC,
+    s ? (unsigned)s->id.PID : 0u);
 
   httpd_resp_set_type(req, "application/json");
   httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
@@ -132,9 +140,38 @@ static esp_err_t control_handler(httpd_req_t *req) {
     return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "no sensor");
   }
 
-  char query[64];
+  // Exposure and colour, for a layout darker than the bench: measured
+  // 2026-10-24, SVGA ran ~7fps indoors at 1.9Mbps, so the sensor's exposure,
+  // not WiFi, sets the frame rate. Ranges are the esp32-camera sensor.h ones.
+  struct Knob { const char *key; int lo, hi; int (*set)(sensor_t *, int); };
+  static const Knob knobs[] = {
+    {"gainceiling", 0, 6, [](sensor_t *s, int v) { return s->set_gainceiling(s, (gainceiling_t)v); }},
+    {"aec2", 0, 1, [](sensor_t *s, int v) { return s->set_aec2(s, v); }},
+    {"ae_level", -2, 2, [](sensor_t *s, int v) { return s->set_ae_level(s, v); }},
+    {"aec", 0, 1, [](sensor_t *s, int v) { return s->set_exposure_ctrl(s, v); }},
+    {"aec_value", 0, 1200, [](sensor_t *s, int v) { return s->set_aec_value(s, v); }},
+    {"agc", 0, 1, [](sensor_t *s, int v) { return s->set_gain_ctrl(s, v); }},
+    {"agc_gain", 0, 30, [](sensor_t *s, int v) { return s->set_agc_gain(s, v); }},
+    {"brightness", -2, 2, [](sensor_t *s, int v) { return s->set_brightness(s, v); }},
+    {"contrast", -2, 2, [](sensor_t *s, int v) { return s->set_contrast(s, v); }},
+    {"saturation", -2, 2, [](sensor_t *s, int v) { return s->set_saturation(s, v); }},
+    {"awb", 0, 1, [](sensor_t *s, int v) { return s->set_whitebal(s, v); }},
+    {"awb_gain", 0, 1, [](sensor_t *s, int v) { return s->set_awb_gain(s, v); }},
+    {"wb_mode", 0, 4, [](sensor_t *s, int v) { return s->set_wb_mode(s, v); }},
+    {"lenc", 0, 1, [](sensor_t *s, int v) { return s->set_lenc(s, v); }},
+    {"bpc", 0, 1, [](sensor_t *s, int v) { return s->set_bpc(s, v); }},
+    {"wpc", 0, 1, [](sensor_t *s, int v) { return s->set_wpc(s, v); }},
+  };
+
+  char query[256];
   if (httpd_req_get_url_query_str(req, query, sizeof(query)) == ESP_OK) {
     char val[8];
+    for (const Knob &k : knobs) {
+      if (httpd_query_key_value(query, k.key, val, sizeof(val)) == ESP_OK) {
+        int v = atoi(val);
+        if (v >= k.lo && v <= k.hi) k.set(s, v);
+      }
+    }
     // Clamped, not trusted. set_framesize() indexes the sensor's resolution
     // table with this, so an out-of-range value reads off the end of it.
     if (httpd_query_key_value(query, "framesize", val, sizeof(val)) == ESP_OK) {
@@ -150,9 +187,17 @@ static esp_err_t control_handler(httpd_req_t *req) {
   }
 
   // Echo what actually stuck, so a rejected value is visible rather than silent.
-  char buf[64];
-  int len = snprintf(buf, sizeof(buf), "{\"framesize\":%d,\"quality\":%d}",
-                     (int)s->status.framesize, (int)s->status.quality);
+  const camera_status_t &c = s->status;
+  char buf[384];
+  int len = snprintf(buf, sizeof(buf),
+    "{\"framesize\":%d,\"quality\":%d,\"gainceiling\":%d,\"aec2\":%d,"
+    "\"ae_level\":%d,\"aec\":%d,\"aec_value\":%d,\"agc\":%d,\"agc_gain\":%d,"
+    "\"brightness\":%d,\"contrast\":%d,\"saturation\":%d,\"awb\":%d,"
+    "\"awb_gain\":%d,\"wb_mode\":%d,\"lenc\":%d,\"bpc\":%d,\"wpc\":%d}",
+    (int)c.framesize, (int)c.quality, (int)c.gainceiling, (int)c.aec2,
+    (int)c.ae_level, (int)c.aec, (int)c.aec_value, (int)c.agc, (int)c.agc_gain,
+    (int)c.brightness, (int)c.contrast, (int)c.saturation, (int)c.awb,
+    (int)c.awb_gain, (int)c.wb_mode, (int)c.lenc, (int)c.bpc, (int)c.wpc);
   httpd_resp_set_type(req, "application/json");
   httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
   return httpd_resp_send(req, buf, len);

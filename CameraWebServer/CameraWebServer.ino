@@ -27,6 +27,11 @@ static const uint32_t WIFI_CONNECT_TIMEOUT_MS = 30000;
 // How long the link may stay down while running before we give up on it.
 static const uint32_t WIFI_GRACE_MS = 30000;
 static const uint32_t WDT_TIMEOUT_MS = 60000;
+static const uint32_t TELEMETRY_INTERVAL_MS = 60000;
+static const uint8_t BATTERY_ADC_PIN = A0;
+// ponytail: two equal 100k resistors halve BAT+ at A0. Adjust this only after
+// comparing /status battery_mv with a meter at the battery pads.
+static const float BATTERY_CALIBRATION = 1.0f;
 
 // RTC memory survives a soft reset but not a power cycle, which is exactly the
 // scope we want: "how much has this board struggled since someone plugged it
@@ -38,6 +43,24 @@ RTC_DATA_ATTR uint32_t wifiRestartCount = 0;
 // Last time the link was seen up. Not in RTC memory: it is meaningless across a
 // reboot, and a stale value would trigger an immediate second restart.
 static uint32_t lastConnectedMs = 0;
+static uint32_t lastTelemetryMs = 0;
+uint32_t batteryMillivolts = 0;
+float dieTemperatureC = 0;
+
+static uint32_t readBatteryMillivolts() {
+  analogRead(BATTERY_ADC_PIN);  // discard the first sample while the ADC settles
+  uint32_t sum = 0;
+  for (uint8_t i = 0; i < 16; i++) {
+    sum += analogReadMilliVolts(BATTERY_ADC_PIN);
+  }
+  return (uint32_t)((sum / 16.0f) * 2.0f * BATTERY_CALIBRATION);
+}
+
+static void updateTelemetry() {
+  batteryMillivolts = readBatteryMillivolts();
+  dieTemperatureC = temperatureRead();
+  lastTelemetryMs = millis();
+}
 
 // Bounded connect. Returns false rather than blocking, so every caller has to
 // decide what to do about failure.
@@ -75,6 +98,8 @@ void setup() {
   Serial.println();
 
   bootCount++;
+  analogSetPinAttenuation(BATTERY_ADC_PIN, ADC_11db);
+  updateTelemetry();
 
   // Core 3.x already starts the task WDT, so init returns INVALID_STATE and we
   // reconfigure instead. Guards against a hang anywhere in the loop task.
@@ -194,6 +219,10 @@ void setup() {
 
 void loop() {
   esp_task_wdt_reset();
+
+  if (millis() - lastTelemetryMs >= TELEMETRY_INTERVAL_MS) {
+    updateTelemetry();
+  }
 
   if (WiFi.status() == WL_CONNECTED) {
     lastConnectedMs = millis();
