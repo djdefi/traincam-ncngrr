@@ -140,9 +140,8 @@ static esp_err_t control_handler(httpd_req_t *req) {
     return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "no sensor");
   }
 
-  // Exposure and colour, for a layout darker than the bench: measured
-  // 2026-10-24, SVGA ran ~7fps indoors at 1.9Mbps, so the sensor's exposure,
-  // not WiFi, sets the frame rate. Ranges are the esp32-camera sensor.h ones.
+  // Exposure and colour, so a layout darker than the bench can be tuned live
+  // rather than through flash cycles. Ranges are the esp32-camera sensor.h ones.
   struct Knob { const char *key; int lo, hi; int (*set)(sensor_t *, int); };
   static const Knob knobs[] = {
     {"gainceiling", 0, 6, [](sensor_t *s, int v) { return s->set_gainceiling(s, (gainceiling_t)v); }},

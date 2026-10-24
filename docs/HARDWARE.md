@@ -159,8 +159,9 @@ the playbook, so `/dev/i2c-1` does not exist and the gauge cannot be seen at all
 (`gainceiling` 0–6, `aec2`, `ae_level` -2–2, `aec`/`aec_value`, `agc`/`agc_gain`,
 `brightness`/`contrast`/`saturation`, `awb`/`awb_gain`/`wb_mode` 0–4, `lenc`,
 `bpc`, `wpc`), and echoes what stuck. Changes last until reboot; bake the winners
-into `setup()`. Indoors on 2026-10-24, SVGA ran ~7fps at ~1.9Mbps — exposure,
-not WiFi, set the frame rate — so light on the scene beats any setting.
+into `setup()`. Measured 2026-10-24: SVGA tops out at ~8–12fps whether the
+room is dim or lit (smaller JPEGs help a little; 400x296 reaches ~18fps), and
+WiFi is not the limit (ping ~14ms, ~2Mbps used).
 
 ## Physical Installation
 
