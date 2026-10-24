@@ -53,3 +53,4 @@ CameraWebServer/secrets.h
 /dependencies.lock
 /managed_components/
 /sdkconfig.*
+/.dummy/

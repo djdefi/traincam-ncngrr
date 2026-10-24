@@ -164,7 +164,10 @@ room is dim or lit (smaller JPEGs help a little; 400x296 reaches ~18fps). The
 cap is the Arduino core's prebuilt 5.7KB TCP send buffer: throughput is about
 buffer ÷ round-trip, ~2Mbps at a 14ms ping. `platformio.ini` rebuilds the core
 with 64KB TCP buffers and a wider WiFi TX window (`pio run -t upload`); the
-Arduino IDE build cannot change these.
+Arduino IDE build cannot change these. Measured 2026-10-24 on the same board
+(OV2640, SVGA, quality 12): 8.0fps / 1.1Mbps before, 32.8fps / 5.3Mbps after,
+heap ~205KB free, die ~68°C. Quality 8 still runs ~30fps; quality 6 overflows
+the frame buffer and stalls the stream until quality is raised again.
 
 ## Physical Installation
 
