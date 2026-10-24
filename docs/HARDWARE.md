@@ -160,8 +160,11 @@ the playbook, so `/dev/i2c-1` does not exist and the gauge cannot be seen at all
 `brightness`/`contrast`/`saturation`, `awb`/`awb_gain`/`wb_mode` 0–4, `lenc`,
 `bpc`, `wpc`), and echoes what stuck. Changes last until reboot; bake the winners
 into `setup()`. Measured 2026-10-24: SVGA tops out at ~8–12fps whether the
-room is dim or lit (smaller JPEGs help a little; 400x296 reaches ~18fps), and
-WiFi is not the limit (ping ~14ms, ~2Mbps used).
+room is dim or lit (smaller JPEGs help a little; 400x296 reaches ~18fps). The
+cap is the Arduino core's prebuilt 5.7KB TCP send buffer: throughput is about
+buffer ÷ round-trip, ~2Mbps at a 14ms ping. `platformio.ini` rebuilds the core
+with 64KB TCP buffers and a wider WiFi TX window (`pio run -t upload`); the
+Arduino IDE build cannot change these.
 
 ## Physical Installation
 
