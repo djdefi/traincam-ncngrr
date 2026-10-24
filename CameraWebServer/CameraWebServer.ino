@@ -68,6 +68,9 @@ static bool connectWiFi(uint32_t timeoutMs) {
   WiFi.mode(WIFI_STA);
   WiFi.setSleep(false);        // power save wakes badly under load; we are not on a coin cell
   WiFi.setAutoReconnect(true); // lets brief drops heal without a reboot
+  // macOS/iOS resolve .local for IPv4 and IPv6 together; with no IPv6 address
+  // mDNS never answers the AAAA query and every lookup waits a 5s timeout.
+  WiFi.enableIPv6();
   WiFi.begin(ssid, password);
 
   const uint32_t start = millis();
