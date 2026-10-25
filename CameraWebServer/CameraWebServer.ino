@@ -106,10 +106,14 @@ static bool connectWiFi(uint32_t timeoutMs) {
   // parks the radio between DTIM beacons, which shows up as latency spikes on a
   // stream. Re-assert it here, after association, where it sticks.
   esp_wifi_set_ps(WIFI_PS_NONE);
+  // 13dBm (default is 20dBm) ran ~10°C cooler streaming, with better fps and
+  // ping, at -48..-54dBm RSSI. Raise live with /control?tx_power=80 if needed.
+  esp_wifi_set_max_tx_power(52);
   return true;
 }
 
 void setup() {
+  setCpuFrequencyMhz(160);  // 240MHz bought no fps and only added heat
   // Serial was previously guarded by `if (Serial)` BEFORE Serial.begin(), so on
   // a board with native USB CDC it could skip init entirely - and then the
   // camera failure message below printed nowhere. On a device with no display

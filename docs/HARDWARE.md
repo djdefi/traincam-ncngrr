@@ -179,7 +179,21 @@ Above SVGA the OV2640 drops to its slower full-resolution mode, and HD showed
 vertical stripe noise and a darker image; SVGA q10 looks best. The die runs hot:
 68°C idle (camera always capturing, WiFi power save off, battery charging),
 ~80–87°C streaming at 20fps, 92°C+ uncapped — hence the default cap. Give it
-airflow in the car. After a viewer disconnects the next one waits ~8s for the
+airflow in the car.
+
+The radio and CPU are most of that heat. A 6-minute soak per setting, streaming
+at the 20fps cap (temperature at the end):
+
+| tx_power | cpu_mhz | °C | fps | ping |
+|---|---|---|---|---|
+| 80 (20dBm) | 240 | 85 | 17 | 55ms |
+| 52 (13dBm) | 240 | 74 | 19 | 14ms |
+| 80 | 160 | 85 | 19 | 24ms |
+| 52 | 160 (default) | 69 | 20 | 10ms |
+
+That was at -48..-54dBm RSSI. If the car loses signal far from the router, raise
+the power live with `/control?tx_power=80` (8–84, in 0.25dBm steps); `cpu_mhz`
+takes 80/160/240. After a viewer disconnects the next one waits ~8s for the
 single stream slot (the server's 5s send timeout on the dead socket).
 
 ## Physical Installation

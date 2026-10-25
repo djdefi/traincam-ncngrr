@@ -2,6 +2,7 @@
 #include "esp_camera.h"
 #include "img_converters.h"
 #include <WiFi.h>
+#include <esp_wifi.h>
 
 #if defined(ARDUINO_ARCH_ESP32) && defined(CONFIG_ARDUHAL_ESP_LOG)
 #include "esp32-hal-log.h"
@@ -198,20 +199,32 @@ static esp_err_t control_handler(httpd_req_t *req) {
       int f = atoi(val);
       if (f >= 0 && f <= 60) maxFps = f;
     }
+    // Radio and CPU are most of the die heat. tx_power is in 0.25dBm steps
+    // (8 = 2dBm .. 84 = 21dBm); cpu_mhz 80/160/240.
+    if (httpd_query_key_value(query, "tx_power", val, sizeof(val)) == ESP_OK) {
+      int p = atoi(val);
+      if (p >= 8 && p <= 84) esp_wifi_set_max_tx_power(p);
+    }
+    if (httpd_query_key_value(query, "cpu_mhz", val, sizeof(val)) == ESP_OK) {
+      int m = atoi(val);
+      if (m == 80 || m == 160 || m == 240) setCpuFrequencyMhz(m);
+    }
   }
 
   // Echo what actually stuck, so a rejected value is visible rather than silent.
   const camera_status_t &c = s->status;
+  int8_t txp = 0;
+  esp_wifi_get_max_tx_power(&txp);
   char buf[384];
   int len = snprintf(buf, sizeof(buf),
     "{\"framesize\":%d,\"quality\":%d,\"gainceiling\":%d,\"aec2\":%d,"
     "\"ae_level\":%d,\"aec\":%d,\"aec_value\":%d,\"agc\":%d,\"agc_gain\":%d,"
     "\"brightness\":%d,\"contrast\":%d,\"saturation\":%d,\"awb\":%d,"
-    "\"awb_gain\":%d,\"wb_mode\":%d,\"lenc\":%d,\"bpc\":%d,\"wpc\":%d,\"fps\":%d}",
+    "\"awb_gain\":%d,\"wb_mode\":%d,\"lenc\":%d,\"bpc\":%d,\"wpc\":%d,\"fps\":%d,\"tx_power\":%d,\"cpu_mhz\":%d}",
     (int)c.framesize, (int)c.quality, (int)c.gainceiling, (int)c.aec2,
     (int)c.ae_level, (int)c.aec, (int)c.aec_value, (int)c.agc, (int)c.agc_gain,
     (int)c.brightness, (int)c.contrast, (int)c.saturation, (int)c.awb,
-    (int)c.awb_gain, (int)c.wb_mode, (int)c.lenc, (int)c.bpc, (int)c.wpc, maxFps);
+    (int)c.awb_gain, (int)c.wb_mode, (int)c.lenc, (int)c.bpc, (int)c.wpc, maxFps, (int)txp, (int)getCpuFrequencyMhz());
   httpd_resp_set_type(req, "application/json");
   httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
   return httpd_resp_send(req, buf, len);
