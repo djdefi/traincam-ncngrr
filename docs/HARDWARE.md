@@ -159,15 +159,28 @@ the playbook, so `/dev/i2c-1` does not exist and the gauge cannot be seen at all
 (`gainceiling` 0–6, `aec2`, `ae_level` -2–2, `aec`/`aec_value`, `agc`/`agc_gain`,
 `brightness`/`contrast`/`saturation`, `awb`/`awb_gain`/`wb_mode` 0–4, `lenc`,
 `bpc`, `wpc`), and echoes what stuck. Changes last until reboot; bake the winners
-into `setup()`. Measured 2026-10-24: SVGA tops out at ~8–12fps whether the
-room is dim or lit (smaller JPEGs help a little; 400x296 reaches ~18fps). The
-cap is the Arduino core's prebuilt 5.7KB TCP send buffer: throughput is about
-buffer ÷ round-trip, ~2Mbps at a 14ms ping. `platformio.ini` rebuilds the core
-with 64KB TCP buffers and a wider WiFi TX window (`pio run -t upload`); the
-Arduino IDE build cannot change these. Measured 2026-10-24 on the same board
-(OV2640, SVGA, quality 12): 8.0fps / 1.1Mbps before, 32.8fps / 5.3Mbps after,
-heap ~205KB free, die ~68°C. Quality 8 still runs ~30fps; quality 6 overflows
-the frame buffer and stalls the stream until quality is raised again.
+into `setup()`. `fps=N` caps the frame rate (default 20, which streams ~17fps since each frame then waits for the sensor; 0 = uncapped).
+
+Measured 2026-10-24 (OV2640, SVGA): the Arduino core's prebuilt 5.7KB TCP send
+buffer capped the stream at ~8fps / 1.1Mbps (throughput ≈ buffer ÷ round-trip).
+`platformio.ini` rebuilds the core with 64KB TCP buffers and a wider WiFi TX
+window (`pio run -t upload`); the Arduino IDE build cannot change these. With
+it, uncapped:
+
+| framesize | quality | fps | KB/frame |
+|---|---|---|---|
+| 11 SVGA 800x600 | 10 (default) | 25 | 39 |
+| 11 SVGA | 8 | 19 | 47 |
+| 11 SVGA | 6 | 10 | 59 |
+| 13 HD 1280x720 | 10 | 10 | 77 |
+| 15 UXGA 1600x1200 | 10 | 5 | 171 |
+
+Above SVGA the OV2640 drops to its slower full-resolution mode, and HD showed
+vertical stripe noise and a darker image; SVGA q10 looks best. The die runs hot:
+68°C idle (camera always capturing, WiFi power save off, battery charging),
+~80–87°C streaming at 20fps, 92°C+ uncapped — hence the default cap. Give it
+airflow in the car. After a viewer disconnects the next one waits ~8s for the
+single stream slot (the server's 5s send timeout on the dead socket).
 
 ## Physical Installation
 

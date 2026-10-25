@@ -33,6 +33,11 @@ httpd_handle_t stream_httpd = NULL;
 // being a second camera and starts serving the hall.
 httpd_handle_t camera_httpd = NULL;
 
+// Spare frames cost radio time, i.e. heat. Measured 2026-10-24 at SVGA q10 after
+// 5 min: uncapped (~25fps) 92.6C and climbing, 20fps 77-87C, 15fps 81-85C,
+// idle 68C. 0 = uncapped; change live with /control?fps=N.
+static volatile int maxFps = 20;
+
 static esp_err_t stream_handler(httpd_req_t *req) {
   camera_fb_t *fb = NULL;
   struct timeval _timestamp;
@@ -48,7 +53,13 @@ static esp_err_t stream_handler(httpd_req_t *req) {
 
   httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
 
+  int64_t lastFrameUs = 0;
   while (true) {
+    if (maxFps > 0) {
+      int64_t waitUs = 1000000 / maxFps - (esp_timer_get_time() - lastFrameUs);
+      if (waitUs > 0) vTaskDelay(pdMS_TO_TICKS(waitUs / 1000));
+    }
+    lastFrameUs = esp_timer_get_time();
     fb = esp_camera_fb_get();
     if (!fb) {
       log_e("Camera capture failed");
@@ -183,6 +194,10 @@ static esp_err_t control_handler(httpd_req_t *req) {
       int q = atoi(val);
       if (q >= 4 && q <= 63) s->set_quality(s, q);
     }
+    if (httpd_query_key_value(query, "fps", val, sizeof(val)) == ESP_OK) {
+      int f = atoi(val);
+      if (f >= 0 && f <= 60) maxFps = f;
+    }
   }
 
   // Echo what actually stuck, so a rejected value is visible rather than silent.
@@ -192,11 +207,11 @@ static esp_err_t control_handler(httpd_req_t *req) {
     "{\"framesize\":%d,\"quality\":%d,\"gainceiling\":%d,\"aec2\":%d,"
     "\"ae_level\":%d,\"aec\":%d,\"aec_value\":%d,\"agc\":%d,\"agc_gain\":%d,"
     "\"brightness\":%d,\"contrast\":%d,\"saturation\":%d,\"awb\":%d,"
-    "\"awb_gain\":%d,\"wb_mode\":%d,\"lenc\":%d,\"bpc\":%d,\"wpc\":%d}",
+    "\"awb_gain\":%d,\"wb_mode\":%d,\"lenc\":%d,\"bpc\":%d,\"wpc\":%d,\"fps\":%d}",
     (int)c.framesize, (int)c.quality, (int)c.gainceiling, (int)c.aec2,
     (int)c.ae_level, (int)c.aec, (int)c.aec_value, (int)c.agc, (int)c.agc_gain,
     (int)c.brightness, (int)c.contrast, (int)c.saturation, (int)c.awb,
-    (int)c.awb_gain, (int)c.wb_mode, (int)c.lenc, (int)c.bpc, (int)c.wpc);
+    (int)c.awb_gain, (int)c.wb_mode, (int)c.lenc, (int)c.bpc, (int)c.wpc, maxFps);
   httpd_resp_set_type(req, "application/json");
   httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
   return httpd_resp_send(req, buf, len);

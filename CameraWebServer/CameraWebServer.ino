@@ -3,6 +3,7 @@
 #include <WiFi.h>
 #include <esp_task_wdt.h>
 #include <esp_wifi.h>
+#include <driver/temperature_sensor.h>
 
 #define CAMERA_MODEL_XIAO_ESP32S3 // Has PSRAM
 
@@ -56,9 +57,26 @@ static uint32_t readBatteryMillivolts() {
   return (uint32_t)((sum / 16.0f) * 2.0f * BATTERY_CALIBRATION);
 }
 
+// Not temperatureRead(): the core installs the sensor for 10-50C, which selects
+// the -10..80C hardware range, so readings above 80C are out of range. Ask for
+// 20-100C (+/-2C) since a streaming board runs 60-85C.
+static float readDieTemperature() {
+  static temperature_sensor_handle_t sensor = NULL;
+  if (sensor == NULL) {
+    temperature_sensor_config_t cfg = TEMPERATURE_SENSOR_CONFIG_DEFAULT(20, 100);
+    if (temperature_sensor_install(&cfg, &sensor) != ESP_OK || temperature_sensor_enable(sensor) != ESP_OK) {
+      sensor = NULL;
+      return NAN;
+    }
+  }
+  float c = NAN;
+  temperature_sensor_get_celsius(sensor, &c);
+  return c;
+}
+
 static void updateTelemetry() {
   batteryMillivolts = readBatteryMillivolts();
-  dieTemperatureC = temperatureRead();
+  dieTemperatureC = readDieTemperature();
   lastTelemetryMs = millis();
 }
 

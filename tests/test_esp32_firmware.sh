@@ -125,7 +125,7 @@ for token in "wifi_restarts" "min_heap" "uptime_s" "battery_mv" "temperature_c" 
 done
 
 for token in "analogReadMilliVolts" "BATTERY_CALIBRATION" "16.0f) * 2.0f" \
-             "TELEMETRY_INTERVAL_MS" "temperatureRead()"; do
+             "TELEMETRY_INTERVAL_MS" "temperature_sensor_get_celsius"; do
   if grep -qF "$token" "$INO"; then got=yes; else got=no; fi
   check "battery divider readout: $token present" "$got" "yes"
 done
@@ -138,6 +138,9 @@ for knob in gainceiling aec2 ae_level aec_value agc_gain awb wb_mode lenc; do
   if grep -qF "{\"$knob\"," "$HTTPD"; then got=yes; else got=no; fi
   check "/control accepts $knob" "$got" "yes"
 done
+
+if grep -qF '"fps", val' "$HTTPD" && grep -qF "static volatile int maxFps = 20;" "$HTTPD"; then got=yes; else got=no; fi
+check "/control accepts fps, default cap 20" "$got" "yes"
 
 echo
 if [[ "$fail" -gt 0 ]]; then
