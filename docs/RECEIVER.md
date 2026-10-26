@@ -50,6 +50,10 @@ after two seconds. HTTP streams close when frames go stale, rather than
 holding a frozen image indefinitely. `/status` returns 503 without fresh
 frames. Slow/disconnected HTTP clients have bounded waits.
 
+The ESP32 relay discards a JPEG if the source disconnects before its declared
+`Content-Length` arrives, then reconnects after two seconds. A partial image
+does not replace the last complete frame or advance the frame-health counters.
+
 The browser selector uses viewer-reported video health, not HTTP reachability:
 WebRTC requires an advancing playback clock; MJPEG requires an image load
 plus fresh relay frame status. Loss selects visitor information; ten seconds

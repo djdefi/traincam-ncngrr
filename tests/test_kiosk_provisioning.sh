@@ -35,8 +35,16 @@ source = path.read_text().replace("{{ trainview_esp32_camera }}", "camera").repl
 relay = {"__name__": "test"}
 exec(compile(source, path, "exec"), relay)
 jpeg = b"\xff\xd8test\xff\xd9"
-stream = io.BytesIO(b"--frame\r\nContent-Type: image/jpeg\r\nContent-Length: 8\r\n\r\n" + jpeg)
+header = b"--frame\r\nContent-Type: image/jpeg\r\nContent-Length: 8\r\n\r\n"
+stream = io.BytesIO(header + jpeg)
 assert relay["read_frame"](stream) == jpeg
+for size in (0, 1, len(jpeg) - 1):
+    try:
+        relay["read_frame"](io.BytesIO(header + jpeg[:size]))
+    except EOFError:
+        pass
+    else:
+        raise AssertionError(f"relay forwarded an incomplete JPEG ({size}/{len(jpeg)} bytes)")
 assert 'path = self.path.partition("?")[0]' in source
 assert 'if path == "/status":' in source
 assert 'if path != "/stream":' in source
