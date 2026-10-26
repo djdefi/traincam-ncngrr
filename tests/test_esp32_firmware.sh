@@ -144,6 +144,12 @@ check "/control accepts fps, default cap 20" "$got" "yes"
 if grep -qF '"tx_power", val' "$HTTPD" && grep -qF "esp_wifi_set_max_tx_power(52);" "$INO" && grep -qF "setCpuFrequencyMhz(160);" "$INO"; then got=yes; else got=no; fi
 check "cool defaults 13dBm/160MHz, tunable via /control" "$got" "yes"
 
+if grep -qF "config.jpeg_quality = 9;" "$CODE"; then got=yes; else got=no; fi
+check "PSRAM JPEG quality defaults to 9" "$got" "yes"
+if grep -qF "s->id.PID == OV2640_PID &&" "$CODE" \
+   && grep -qF "s->set_gainceiling(s, GAINCEILING_4X) != 0" "$CODE"; then got=yes; else got=no; fi
+check "OV2640 uses a checked 4x automatic gain ceiling" "$got" "yes"
+
 echo
 if [[ "$fail" -gt 0 ]]; then
   echo "==> ESP32 firmware tests FAILED ($fail failed, $pass passed)"

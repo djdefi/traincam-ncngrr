@@ -159,7 +159,10 @@ the playbook, so `/dev/i2c-1` does not exist and the gauge cannot be seen at all
 (`gainceiling` 0–6, `aec2`, `ae_level` -2–2, `aec`/`aec_value`, `agc`/`agc_gain`,
 `brightness`/`contrast`/`saturation`, `awb`/`awb_gain`/`wb_mode` 0–4, `lenc`,
 `bpc`, `wpc`), and echoes what stuck. Changes last until reboot; bake the winners
-into `setup()`. `fps=N` caps the frame rate (default 20, which streams ~17fps since each frame then waits for the sensor; 0 = uncapped).
+into `setup()`. `fps=N` caps the frame rate (default 20; capture and WiFi can
+reduce the delivered rate; 0 = uncapped). With PSRAM, JPEG quality defaults to
+9. The OV2640 uses a 4x automatic gain ceiling (`gainceiling=1`) to recover
+shadow detail; automatic exposure and gain remain enabled.
 
 Measured 2026-10-24 (OV2640, SVGA): the Arduino core's prebuilt 5.7KB TCP send
 buffer capped the stream at ~8fps / 1.1Mbps (throughput ≈ buffer ÷ round-trip).
@@ -169,14 +172,15 @@ it, uncapped:
 
 | framesize | quality | fps | KB/frame |
 |---|---|---|---|
-| 11 SVGA 800x600 | 10 (default) | 25 | 39 |
+| 11 SVGA 800x600 | 10 (then default) | 25 | 39 |
 | 11 SVGA | 8 | 19 | 47 |
 | 11 SVGA | 6 | 10 | 59 |
 | 13 HD 1280x720 | 10 | 10 | 77 |
 | 15 UXGA 1600x1200 | 10 | 5 | 171 |
 
 Above SVGA the OV2640 drops to its slower full-resolution mode, and HD showed
-vertical stripe noise and a darker image; SVGA q10 looks best. The die runs hot:
+vertical stripe noise and a darker image; SVGA q10 was chosen in that round.
+With the original radio/CPU settings, the die ran hot:
 68°C idle (camera always capturing, WiFi power save off, battery charging),
 ~80–87°C streaming at 20fps, 92°C+ uncapped — hence the default cap. Give it
 airflow in the car.
@@ -195,6 +199,28 @@ That was at -48..-54dBm RSSI. If the car loses signal far from the router, raise
 the power live with `/control?tx_power=80` (8–84, in 0.25dBm steps); `cpu_mhz`
 takes 80/160/240. After a viewer disconnects the next one waits ~8s for the
 single stream slot (the server's 5s send timeout on the dead socket).
+
+Measured 2026-10-26 on the same OV2640: repeated bench comparisons selected
+JPEG quality 9 and the 4x gain ceiling. Dark objects were more visible and JPEG
+blocking was reduced, at the cost of more grain and larger frames. These are
+not fixed-gain or manual-exposure settings; very bright windows can still clip.
+
+| Settings | Delivered fps | Mean JPEG size |
+|---|---|---|
+| Previous: q10, 2x gain ceiling, 13dBm | 18.8–20.1 | 39–40KB |
+| New: q9, 4x gain ceiling, 13dBm (5-minute run after flashing) | 19.75 | 54.3KB |
+
+The final run delivered 8.58Mbps, with a highest reported die temperature of
+73.6°C, RSSI -48 to -50dBm, unchanged boot/WiFi-restart counters, and minimum
+free heap 150496 bytes. CPU 160MHz, XCLK 24MHz, SVGA and the 20fps cap are
+unchanged. The 20MHz clock and higher TX power did not establish a clear win
+for the selected setup, so neither was retained.
+
+Earlier runs at -67 to -74dBm delivered only about 7–12fps. The later recovery
+to a stronger signal is not an image-setting improvement. These are stationary
+bench results, not proof of moving-train sharpness or enclosed-car cooling.
+To compare the previous image settings live, use
+`:81/control?quality=10&gainceiling=0`; reboot restores the new defaults.
 
 ## Physical Installation
 

@@ -173,7 +173,7 @@ void setup() {
   //                      for larger pre-allocated frame buffer.
   if(config.pixel_format == PIXFORMAT_JPEG){
     if(psramFound()){
-      config.jpeg_quality = 10;
+      config.jpeg_quality = 9;
       config.fb_count = 2;
       config.grab_mode = CAMERA_GRAB_LATEST;
     } else {
@@ -204,6 +204,11 @@ void setup() {
     s->set_vflip(s, 1); // flip it back
     s->set_brightness(s, 1); // up the brightness just a bit
     s->set_saturation(s, -2); // lower the saturation
+  }
+  // Let automatic gain recover shadow detail without the noisier high-gain modes.
+  if (s->id.PID == OV2640_PID &&
+      s->set_gainceiling(s, GAINCEILING_4X) != 0) {
+    Serial.println("Failed to set OV2640 automatic gain ceiling to 4x");
   }
   // The stock sketch drops to QVGA here "for higher initial frame rate". On a
   // kiosk monitor that reads as a broken camera: 320x240 at ~3.6KB a frame,
