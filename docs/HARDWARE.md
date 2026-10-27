@@ -222,6 +222,26 @@ bench results, not proof of moving-train sharpness or enclosed-car cooling.
 To compare the previous image settings live, use
 `:81/control?quality=10&gainceiling=0`; reboot restores the new defaults.
 
+**Long stream pauses.** Average FPS hid occasional freezes. TCP traces showed
+out-of-order data during the gaps, before the receiver relay. The PlatformIO
+build now uses `CONFIG_LWIP_TCP_TMR_INTERVAL=25` instead of 250ms; the
+[ESP-IDF 5.5.5 setting](https://github.com/espressif/esp-idf/blob/v5.5.5/components/lwip/Kconfig)
+supports a shorter interval to speed recovery of unacknowledged packets.
+Reflashing the old build reproduced a 1.42s pause. Two 25ms runs, totaling eight
+minutes, had no gaps over one second; the final five-minute run delivered
+20.28fps, with a longest gap of 519ms and a final reported die temperature of
+69.6°C. This reduces long freezes but does not establish stutter-free video.
+The Arduino IDE build does not apply these SDK settings.
+
+The earlier `CONFIG_ESP_WIFI_DYNAMIC_TX_BUFFER_NUM=64` override was ineffective:
+Arduino initializes its own 32-buffer dynamic configuration unless static
+buffers are explicitly enabled. It was removed. Static-buffer and TCP_NODELAY
+experiments did not establish a further improvement and were not retained.
+
+Low-light quality remains separate: testing 8x/16x/32x gain and longer manual
+exposure in the current near-dark scene did not reveal useful scene detail.
+Those changes were reverted rather than treating brighter noise as a fix.
+
 ## Physical Installation
 
 ```

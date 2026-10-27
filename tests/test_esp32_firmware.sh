@@ -150,6 +150,9 @@ if grep -qF "s->id.PID == OV2640_PID &&" "$CODE" \
    && grep -qF "s->set_gainceiling(s, GAINCEILING_4X) != 0" "$CODE"; then got=yes; else got=no; fi
 check "OV2640 uses a checked 4x automatic gain ceiling" "$got" "yes"
 
+if grep -qFx "  CONFIG_LWIP_TCP_TMR_INTERVAL=25" "$ROOT/platformio.ini"; then got=yes; else got=no; fi
+check "PlatformIO uses the measured 25ms TCP recovery timer" "$got" "yes"
+
 echo
 if [[ "$fail" -gt 0 ]]; then
   echo "==> ESP32 firmware tests FAILED ($fail failed, $pass passed)"
