@@ -162,7 +162,8 @@ the playbook, so `/dev/i2c-1` does not exist and the gauge cannot be seen at all
 into `setup()`. `fps=N` caps the frame rate (default 20; capture and WiFi can
 reduce the delivered rate; 0 = uncapped). With PSRAM, JPEG quality defaults to
 9. The OV2640 uses a 4x automatic gain ceiling (`gainceiling=1`) to recover
-shadow detail; automatic exposure and gain remain enabled.
+shadow detail; automatic exposure and gain remain enabled. The camera clock
+is 20MHz.
 
 Measured 2026-10-24 (OV2640, SVGA): the Arduino core's prebuilt 5.7KB TCP send
 buffer capped the stream at ~8fps / 1.1Mbps (throughput ≈ buffer ÷ round-trip).
@@ -212,15 +213,23 @@ not fixed-gain or manual-exposure settings; very bright windows can still clip.
 
 The final run delivered 8.58Mbps, with a highest reported die temperature of
 73.6°C, RSSI -48 to -50dBm, unchanged boot/WiFi-restart counters, and minimum
-free heap 150496 bytes. CPU 160MHz, XCLK 24MHz, SVGA and the 20fps cap are
-unchanged. The 20MHz clock and higher TX power did not establish a clear win
-for the selected setup, so neither was retained.
+free heap 150496 bytes. In that round, CPU 160MHz, XCLK 24MHz, SVGA and the
+20fps cap were unchanged. The 20MHz clock and higher TX power did not establish
+a clear win in that comparison; the daylight clock result below supersedes it.
 
 Earlier runs at -67 to -74dBm delivered only about 7–12fps. The later recovery
 to a stronger signal is not an image-setting improvement. These are stationary
 bench results, not proof of moving-train sharpness or enclosed-car cooling.
 To compare the previous image settings live, use
 `:81/control?quality=10&gainceiling=0`; reboot restores the new defaults.
+
+**Daylight clock comparison, 2026-10-27.** XGA (1024x768) at quality 9 showed
+strong vertical color stripes at 24MHz. Returning to 20MHz removed the strong
+stripe pattern; reflashing 24MHz reproduced it. The default is now 20MHz,
+with SVGA retained at about 20fps. XGA delivered about 12fps at 20MHz versus
+14–16fps with the striped 24MHz image, so it remains a live option rather than
+the default. Lower gain, contrast changes and quality 8 did not establish a
+better overall image in this daylight comparison.
 
 **Long stream pauses.** Average FPS hid occasional freezes. TCP traces showed
 out-of-order data during the gaps, before the receiver relay. The PlatformIO
@@ -230,8 +239,12 @@ supports a shorter interval to speed recovery of unacknowledged packets.
 Reflashing the old build reproduced a 1.42s pause. Two 25ms runs, totaling eight
 minutes, had no gaps over one second; the final five-minute run delivered
 20.28fps, with a longest gap of 519ms and a final reported die temperature of
-69.6°C. This reduces long freezes but does not establish stutter-free video.
-The Arduino IDE build does not apply these SDK settings.
+69.6°C. A later two-minute daylight run still had a 1.84s gap: this is a
+mitigation, not a freeze fix. Temporary on-board timing at 20MHz subsequently
+recorded 590ms blocked in frame transmission, with no capture wait over 100ms
+in that three-minute run. The remaining delivery pauses are not explained by
+image quality or average FPS. The Arduino IDE build does not apply these SDK
+settings.
 
 The earlier `CONFIG_ESP_WIFI_DYNAMIC_TX_BUFFER_NUM=64` override was ineffective:
 Arduino initializes its own 32-buffer dynamic configuration unless static

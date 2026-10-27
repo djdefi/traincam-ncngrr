@@ -157,11 +157,9 @@ void setup() {
   config.pin_sccb_scl = SIOC_GPIO_NUM;
   config.pin_pwdn = PWDN_GPIO_NUM;
   config.pin_reset = RESET_GPIO_NUM;
-  // 24MHz, not the stock 20MHz. The S3's LCD_CAM peripheral generates XCLK
-  // internally rather than through LEDC, so the higher rate is available and
-  // lifts the OV2640's own ceiling (25->30fps at VGA/SVGA per mjpeg2sd's
-  // README). Watch for colour artifacts if quality is ever pushed below ~10.
-  config.xclk_freq_hz = 24000000;
+  // 24MHz caused reproducible vertical color stripes at XGA. 20MHz keeps
+  // SVGA at the 20fps stream cap without that higher-resolution artifact.
+  config.xclk_freq_hz = 20000000;
   config.frame_size = FRAMESIZE_UXGA;
   config.pixel_format = PIXFORMAT_JPEG; // for streaming
   config.grab_mode = CAMERA_GRAB_WHEN_EMPTY;
