@@ -160,6 +160,19 @@ const beat = (source, live = false) => handlers.message({
   now = 51000;
   intervals[0]();
   assert.equal(feeds.visitor.hidden, false, 'lost heartbeat must trigger fallback');
+  for (now = 52000; now <= 64000; now += 2000) {
+    beat(windows.pi, true);
+    beat(windows.esp32, true);
+  }
+  assert.equal(feeds.esp32.hidden, false, 'ESP32 must win when both train cameras have fresh video');
+  assert.equal(feeds.pi.hidden, true);
+  beat(windows.esp32, false);
+  assert.equal(feeds.pi.hidden, false, 'a healthy Pi remains a fallback when ESP32 is lost');
+  for (now = 68000; now <= 80000; now += 2000) {
+    beat(windows.pi, true);
+    beat(windows.esp32, true);
+  }
+  assert.equal(feeds.esp32.hidden, false, 'ESP32 must return after ten stable seconds');
   console.log('PASS: visible-viewer heartbeat, offline operation, stalling and origin checks');
 })().catch(error => { console.error(error); process.exitCode = 1; });
 JS

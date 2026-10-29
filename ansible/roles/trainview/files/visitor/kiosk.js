@@ -1,6 +1,6 @@
 'use strict';
 const output = new URLSearchParams(location.search).get('output') || '1';
-const ids = output === 'usb' ? ['usb', 'visitor'] : ['pi', 'esp32', 'visitor'];
+const ids = output === 'usb' ? ['usb', 'visitor'] : ['esp32', 'pi', 'visitor'];
 for (const id of ['pi', 'esp32', 'usb', 'visitor']) {
   if (!ids.includes(id)) document.getElementById(id).remove();
 }

@@ -2,9 +2,9 @@
 
 The Raspberry Pi 5 receiver runs two independent 1920x1080 HDMI displays:
 
-- **HDMI-A-2 (smaller display):** live Pi camera, then ESP32 if it has fresh frames; otherwise
+- **HDMI-A-1 (larger display):** live ESP32 camera, then Pi if it has fresh frames; otherwise
   local photographs and visitor information.
-- **HDMI-A-1 (larger display):** full-screen USB camera; visitor information while USB is absent
+- **HDMI-A-2 (smaller display):** full-screen USB camera; visitor information while USB is absent
   or recovering. The USB display does not depend on the Pi camera or WiFi.
 
 Visitor slides rotate every 20 seconds and contain locally stored photos and
