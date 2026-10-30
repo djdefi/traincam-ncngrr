@@ -154,8 +154,28 @@ ThreadingHTTPServer(("127.0.0.1",18083),Handler).serve_forever()
   assert.equal(cameraLayout.result.value.fit, 'contain');
   assert(cameraLayout.result.value.badge >= 24);
   console.log('PASS: real MJPEG frames select the USB camera');
+  async function visitorSlide(client) {
+    return (await client('Runtime.evaluate', { expression:`(() => {
+      const frame = document.querySelector('#visitor iframe');
+      return { visible:frame.checkVisibility(), index:frame.contentWindow.eval('index') };
+    })()`, returnByValue:true })).result.value;
+  }
+  const hiddenSlide = await visitorSlide(usb);
+  assert.equal(hiddenSlide.visible, false);
+  await sleep(21000);
+  assert.equal(await selected(usb), 'usb', 'camera must stay selected while the visitor page is hidden');
+  assert.deepEqual(await visitorSlide(usb), hiddenSlide,
+    'a hidden visitor page must not rotate slides or replace image URLs');
+  const hiddenHealth = await json('http://127.0.0.1:18081/_kiosk/health');
+  assert(Object.values(hiddenHealth.heartbeat_age_s).every(age => age !== null && age < 15));
+  console.log('PASS: hidden visitor slideshow stays idle without interrupting heartbeats');
   await json('http://127.0.0.1:18083/control/stale');
   await until(async () => await selected(usb) === 'visitor', 'stale MJPEG fallback', 15);
+  const visibleSlide = await visitorSlide(usb);
+  assert.equal(visibleSlide.visible, true);
+  await sleep(21000);
+  assert.notEqual((await visitorSlide(usb)).index, visibleSlide.index,
+    'the visitor slideshow must resume automatically when fallback is visible');
   console.log('PASS: HTTP 200 with stale frames falls back to offline visitor display');
   await json('http://127.0.0.1:18083/control/live');
   await until(async () => await selected(usb) === 'usb', 'MJPEG resumes after stale stream');

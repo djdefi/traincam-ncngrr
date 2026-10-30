@@ -14,6 +14,9 @@ connections only to discard them, without delaying startup or changing failover.
 
 Visitor slides rotate every 20 seconds and contain locally stored photos and
 QR codes for the website, historic map, volunteering, and donation inquiries.
+When a camera hides the visitor page, slide rotation and image changes pause;
+the page continues sending health heartbeats and resumes rotation when shown,
+unless the operator has paused it.
 The kiosk needs no internet to show them. Scanning a QR code opens the public
 website on the visitor's phone, which does require internet.
 

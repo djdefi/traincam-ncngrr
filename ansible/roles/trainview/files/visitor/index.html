@@ -53,7 +53,12 @@ document.getElementById('pause').onclick = () => {
   paused = !paused;
   document.getElementById('pause').textContent = paused ? 'Resume slides' : 'Pause slides';
 };
-setInterval(() => { if (!paused) { index = (index + 1) % slides.length; showSlide(); } }, 20000);
+setInterval(() => {
+  // A CSS-hidden iframe still runs timers; keep its heartbeat, not its slideshow.
+  if (paused || (window.frameElement && !window.frameElement.getClientRects().length)) return;
+  index = (index + 1) % slides.length;
+  showSlide();
+}, 20000);
 const heartbeat = () => window.parent.postMessage({ type:'traincam-viewer-heartbeat', live:false }, location.origin);
 heartbeat();
 setInterval(heartbeat, 2000);
