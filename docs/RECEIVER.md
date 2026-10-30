@@ -7,6 +7,11 @@ The Raspberry Pi 5 receiver runs two independent 1920x1080 HDMI displays:
 - **HDMI-A-2 (smaller display):** full-screen USB camera; visitor information while USB is absent
   or recovering. The USB display does not depend on the Pi camera or WiFi.
 
+Screen selection happens before viewer URLs are loaded. The larger screen
+loads only ESP32 and Pi fallback viewers; the smaller screen loads only the
+USB viewer. Both load the local visitor page. This avoids starting camera
+connections only to discard them, without delaying startup or changing failover.
+
 Visitor slides rotate every 20 seconds and contain locally stored photos and
 QR codes for the website, historic map, volunteering, and donation inquiries.
 The kiosk needs no internet to show them. Scanning a QR code opens the public

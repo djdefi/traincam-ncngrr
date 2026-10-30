@@ -101,10 +101,13 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 const source = fs.readFileSync('ansible/roles/trainview/files/visitor/kiosk.js', 'utf8');
 let now = 0;
-const feeds = Object.fromEntries(['pi', 'esp32', 'usb', 'visitor'].map(id => [
-  id, { hidden: false, remove() { this.removed = true; }, querySelector: () => ({ contentWindow: windows[id] }) },
-]));
 const windows = { pi: {}, esp32: {}, usb: {}, visitor: {} };
+const frames = Object.fromEntries(Object.keys(windows).map(id => [
+  id, { contentWindow: windows[id], dataset: { src: `/${id}.html` }, src: '' },
+]));
+const feeds = Object.fromEntries(['pi', 'esp32', 'usb', 'visitor'].map(id => [
+  id, { hidden: false, remove() { this.removed = true; }, querySelector: () => frames[id] },
+]));
 const handlers = {}, intervals = [], requests = [];
 const context = {
   document: { getElementById: id => feeds[id] },
@@ -130,6 +133,10 @@ const beat = (source, live = false) => handlers.message({
   assert.equal(posts().length, 0, 'no heartbeat until a viewer has loaded');
   assert.equal(feeds.visitor.hidden, false);
   assert.equal(feeds.usb.removed, true, 'first screen must not duplicate the USB stream');
+  for (const id of ['esp32', 'pi', 'visitor']) {
+    assert.equal(frames[id].src, frames[id].dataset.src, `${id} must load on the train screen`);
+  }
+  assert.equal(frames.usb.src, '', 'an excluded camera must never start loading');
   beat(windows.visitor);
   tick();
   assert.equal(posts().length, 1, 'an offline but responsive viewer is healthy');

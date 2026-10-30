@@ -73,8 +73,20 @@ try {
       (_, variable) => vars[variable.trim()] ?? '18083');
     fs.writeFileSync(path.join(site, name), source);
   }
-  start('python3', [path.join(root, 'ansible/roles/trainview/files/kiosk-server.py'),
-    '--directory', site, '--port', '18081']);
+  // Delay the selector so eager iframe requests cannot be hidden by a fast script load.
+  start('python3', ['-u', '-c', `
+from functools import partial
+from http.server import ThreadingHTTPServer
+import runpy, sys, time
+kiosk = runpy.run_path(sys.argv[1])
+class Handler(kiosk["Handler"]):
+ def do_GET(self):
+  if self.path == "/visitor/kiosk.js": time.sleep(1)
+  super().do_GET()
+with ThreadingHTTPServer(("127.0.0.1",18081),partial(Handler,directory=sys.argv[2])) as server:
+ server.health = kiosk["Health"]()
+ server.serve_forever()
+`, path.join(root, 'ansible/roles/trainview/files/kiosk-server.py'), site]);
   // A real multipart stream with a controllable stale-frame status endpoint.
   start('python3', ['-u', '-c', `
 import json, sys, time
@@ -125,6 +137,12 @@ ThreadingHTTPServer(("127.0.0.1",18083),Handler).serve_forever()
     return (await client('Runtime.evaluate', { expression:'selected', returnByValue:true })).result.value;
   }
   await until(async () => await selected(usb) === 'usb', 'USB first frame and stable recovery');
+  await until(async () => await selected(first) === 'esp32', 'ESP32 first frame and stable recovery');
+  const viewerRequests = fs.readFileSync(path.join(dir, 'child-0.log'), 'utf8')
+    .split('\n').filter(line => line.includes('"GET /viewer.html?'));
+  assert.equal(viewerRequests.length, 3,
+    `Only assigned camera pages should load: ESP32 and Pi fallback on output 1, USB on output usb. Got:\n${viewerRequests.join('\n')}`);
+  console.log('PASS: only three assigned camera pages load across both screens');
   const cameraLayout = await usb('Runtime.evaluate', { expression:`(() => {
     const f = document.querySelector('#usb iframe');
     const r = f.getBoundingClientRect(), d = f.contentDocument, w = f.contentWindow;
