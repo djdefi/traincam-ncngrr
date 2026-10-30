@@ -12,8 +12,10 @@ loads only ESP32 and Pi fallback viewers; the smaller screen loads only the
 USB viewer. Both load the local visitor page. This avoids starting camera
 connections only to discard them, without delaying startup or changing failover.
 
-Visitor slides rotate every 20 seconds and contain locally stored photos and
-QR codes for the website, historic map, volunteering, and donation inquiries.
+Eight distinct layout photos rotate every 20 seconds (a 2-minute-40-second
+photo loop). The four visitor messages and QR codes for the website, historic
+map, volunteering, and donation inquiries repeat across those photos.
+All photos and QR codes are stored locally.
 When a camera hides the visitor page, slide rotation and image changes pause;
 the page continues sending health heartbeats and resumes rotation when shown,
 unless the operator has paused it.
@@ -132,6 +134,18 @@ Offline photos were approved for this layout kiosk by its operator. Sources:
 [support](https://ncngmodelrailroad.org/donate/), and
 [historic map](https://ncngmodelrailroad.org/map/), accessed September 29, 2026.
 No online donation checkout or confirmed sponsorship program is implied.
+Five additional gallery photos were added on October 30, 2026. They are
+resized JPEGs with a maximum edge of 1280 pixels; no gallery requests occur
+at runtime.
+
+| Local photo | Gallery source |
+|---|---|
+| `depot.jpg` | [Depot and passengers](https://ncngmodelrailroad.org/images/gallery-img_1165.jpg) |
+| `mine.jpg` | [Mine and timber ore bin](https://ncngmodelrailroad.org/images/gallery-img_1181.jpg) |
+| `repair-yard.jpg` | [Freight-car repair scene](https://ncngmodelrailroad.org/images/gallery-img_1173.jpg) |
+| `car-show.jpg` | [Miniature car show](https://ncngmodelrailroad.org/images/gallery-img_1566.jpg) |
+| `christmas-train.jpg` | [No. 9 by the decorated Kidder house](https://ncngmodelrailroad.org/images/gallery-img_9711.jpg) |
+
 The QR PNGs are generated locally with Python `qrcode` 8.2, error correction M,
 ten-pixel modules and a four-module quiet zone. No runtime QR dependency or
 third-party QR service is used.
